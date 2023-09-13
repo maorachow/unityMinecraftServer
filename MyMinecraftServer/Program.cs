@@ -61,7 +61,7 @@ class Program
     static object listLock = new object();
     static PriorityQueue<KeyValuePair<Socket, Message>, int> toDoList2 = new PriorityQueue<KeyValuePair<Socket, Message>, int>();
     static PriorityQueue<KeyValuePair<Socket,Message>,int> toDoList=new PriorityQueue<KeyValuePair<Socket,Message>,int>();
-    static IPAddress ip = IPAddress.Parse("127.0.0.1");
+    static IPAddress ip = IPAddress.Parse("192.168.0.111");
     static int port = 11111;
     static Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
     static List<Socket> allClientSocketsOnline=new List<Socket>();
