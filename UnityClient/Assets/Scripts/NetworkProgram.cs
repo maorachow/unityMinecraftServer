@@ -75,7 +75,7 @@ public class NetworkProgram : MonoBehaviour
     public static Queue<Message> toDoList=new Queue<Message>();
     public static UserData currentPlayer;
     public static string clientUserName = "Default User";
-    static IPAddress ip = IPAddress.Parse("127.0.0.1");
+    public static IPAddress ip = IPAddress.Parse("127.0.0.1");
     static int port = 11111;
     static Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
     public static bool isGoingToQuitGame=false;
@@ -94,6 +94,7 @@ public class NetworkProgram : MonoBehaviour
             }catch(Exception e){
                 isGoingToQuitGame=true;
              //   warnText.text="Failed Connecting: "+e.ToString();
+             GameLauncher.returnToMenuTextContent="Failed Connecting:"+e.ToString();
                 return;
             }
             currentPlayer = new UserData(UnityEngine.Random.Range(-1f,1f) * 10f+15f, 100f, UnityEngine.Random.Range(-1f,1f) * 10f+15f, UnityEngine.Random.Range(-1f,1f)  * 10f, clientUserName);
@@ -159,7 +160,7 @@ public class NetworkProgram : MonoBehaviour
     {
         while (IsSocketAvaliable(clientSocket))
         {
-         //   Thread.Sleep(1000);
+            Thread.Sleep(10);
             try
             {
             byte[] data = new byte[1024000];
@@ -173,6 +174,9 @@ public class NetworkProgram : MonoBehaviour
                    
                 if (s.Length > 0) {
                   //   Debug.Log(s);
+                  if(s.Length>1024000){
+                    continue;
+                  }
                         Message m=JsonSerializer.Deserialize<Message>(s);
                         toDoList.Enqueue(m);
                     

@@ -32,7 +32,7 @@ public class Chunk : MonoBehaviour
     }
     public void BuildChunk()
     {
-    Debug.Log("BuildChunk");
+  //  Debug.Log("BuildChunk");
     chunkMesh = new Mesh();
     List<Vector3> verts = new List<Vector3>();
     List<Vector2> uvs = new List<Vector2>();

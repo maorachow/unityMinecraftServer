@@ -13,6 +13,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Dynamic;
 using System.Linq;
 using Utf8Json;
+using System.Security.Cryptography;
 
 public class BlockModifyData
 {
@@ -58,6 +59,7 @@ class Program
     static Chunk world;
     static Dictionary<Vector2Int,Chunk> chunks= new Dictionary<Vector2Int,Chunk>();
     static object listLock = new object();
+    static PriorityQueue<KeyValuePair<Socket, Message>, int> toDoList2 = new PriorityQueue<KeyValuePair<Socket, Message>, int>();
     static PriorityQueue<KeyValuePair<Socket,Message>,int> toDoList=new PriorityQueue<KeyValuePair<Socket,Message>,int>();
     static IPAddress ip = IPAddress.Parse("127.0.0.1");
     static int port = 11111;
@@ -116,19 +118,23 @@ class Program
     public static async void RecieveClient(object socket)
     {
         Socket s = (Socket)socket;
-        byte[] bb = new byte[1024];
+        byte[] bb = new byte[102400];
         ArraySegment<byte> b= new ArraySegment<byte>(bb);
         while(true)
         {
             try
-        {
+            {//public int Receive (System.Collections.Generic.IList<ArraySegment<byte>> buffers);
                 if (s == null||s.Connected==false)
                 {
                     Console.WriteLine("Recieve client failed:socket closed");
                     return;
                 }
                 int count =await s.ReceiveAsync(b,new SocketFlags());
-            string str = System.Text.Encoding.UTF8.GetString(b.ToArray(),0,count);
+                if (count>65536)
+                {
+                    UserLogout(s);
+                }
+                string str = System.Text.Encoding.UTF8.GetString(b.ToArray(),0,count);
                 foreach (string x in str.Split('&'))
                 {
                       if (x.Length > 0)
@@ -136,7 +142,11 @@ class Program
                //         Console.WriteLine(x);
                            lock (listLock)
                           {
-                         //   object o= JsonSerializer.Deserialize<object>(x);
+                            //   object o= JsonSerializer.Deserialize<object>(x);
+                            if (x.Length > 65536)
+                            {
+                                UserLogout(s);
+                            }
                             Message m = JsonSerializer.Deserialize<Message>(x);
                         switch (m.messageType)
                         {
@@ -237,7 +247,7 @@ class Program
         while(true)
         {
 
-  switch (Console.ReadKey().KeyChar)
+            switch (Console.ReadKey().KeyChar)
         {
                 case '1':
             Console.WriteLine("\n");
@@ -263,8 +273,112 @@ class Program
     }
 
 
+    static void ExecuteToDoList()
+    {
+        while (true)
+        {
+       
+                Socket s;
+                Message message;
+                Thread.Sleep(10);
+                //  byte[] recieve = new byte[1024];
+                if (toDoList.Count > 0)
+                {
+                lock (listLock)
+                {
+
+               
+                    message = toDoList.Peek().Value;
+                    if (message == null)
+                    {
+                        Console.WriteLine("Empty Message");
+                        toDoList.Dequeue();
+                        continue;
+                    }
+                    s = toDoList.Peek().Key;
+                    toDoList.Dequeue();
 
 
+
+
+                
+
+                switch (message.messageType)
+                {
+                    //message content type:Vector2int
+                    case "ChunkGen":
+                        Vector2Int v = JsonSerializer.Deserialize<Vector2Int>(message.messageContent);
+                        if (!chunks.ContainsKey(v))
+                        {
+                            Chunk c = new Chunk(v);
+                            chunks.TryAdd(v, c);
+                            c.InitMap(v);
+                            //   world = new Chunk(new Vector2Int(0, 0));
+                            //  world.InitMap(new Vector2Int(0, 0));
+                            SendToClient(s, new Message("WorldData", JsonSerializer.ToJsonString(c)));
+                        }
+                        else
+                        {
+                            SendToClient(s, new Message("WorldData", JsonSerializer.ToJsonString(chunks[v])));
+                        }
+
+                        break;
+                    //message content type:blockmodifydata
+                    case "UpdateChunk":
+                        BlockModifyData b = JsonSerializer.Deserialize<BlockModifyData>(message.messageContent);
+                        if (GetChunk(Vec3ToChunkPos(new Vector3(b.x, b.y, b.z))) == null)
+                        {
+                            SendToClient(s, new Message("ChunkNotFound", "ChunkNotFound"));
+                        }
+                        else
+                        {
+                            Vector2Int x = Vec3ToChunkPos(new Vector3(b.x, b.y, b.z));
+                            Vector3 chunkSpacePos = new Vector3(b.x, b.y, b.z) - new Vector3(x.x, 0, x.y);
+                            GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z] = b.convertType;
+                            CastToAllClients(new Message("WorldData", JsonSerializer.ToJsonString(GetChunk(x))));
+                        }
+
+
+
+
+                        break;
+                    case "LogOut":
+                        UserLogout(s);
+                        break;
+                    //message content type:userdata
+                    case "UpdateUser":
+                        UserData u = JsonSerializer.Deserialize<UserData>(message.messageContent);
+
+
+                        int idx = allUserData.FindIndex(delegate (UserData pl) { return pl.userName == u.userName; });
+                        if (idx != -1)
+                        {
+                            allUserData[idx] = u;
+
+                        }
+                        CastToAllClients(new Message("ReturnAllUserData", JsonSerializer.ToJsonString(allUserData)));
+                        break;
+                    case "UpdateAllUser":
+                        CastToAllClients(new Message("ClientUpdateUser", "update"));
+
+                        break;
+                    case "Login":
+                        UserLogin(s, message.messageContent);
+                        //  s.Send(System.Text.Encoding.Default.GetBytes(JsonSerializer.ToJsonString(new Message("LoginReturn", "Hello"))));
+
+                        break;
+                    default:
+                        s.Send(System.Text.Encoding.Default.GetBytes(JsonSerializer.ToJsonString(new Message("UnknownMessage", "UnknownMessage")) + '&'));
+                        break;
+                }
+                }
+                   
+            }
+
+
+
+        }
+    }
     static void Main(string[] args)
     {
         serverSocket.Bind(new IPEndPoint(ip, port));
@@ -275,106 +389,10 @@ class Program
         Thread ServerConsoleControlThread = new Thread(() => ServerConsoleControl());
         ServerConsoleControlThread.Start();
 
-        while (true)
-        {
-            if (toDoList.Count > 0)
-            {
-             Socket s;
-            Message message;
-            Thread.Sleep(10);
-            //  byte[] recieve = new byte[1024];
-            
-           lock (listLock)
-            {
-              
-              
-                message=toDoList.Peek().Value;
-                    if (message == null)
-                    {
-                        Console.WriteLine("Empty Message");
-                        toDoList.Dequeue();
-                        continue;
-                    }
-                s = toDoList.Peek().Key;
-                toDoList.Dequeue();
-                
-               
-                
-               
-            }
-       
-            switch(message.messageType) {
-                    //message content type:Vector2int
-                         case "ChunkGen":
-                        Vector2Int v= JsonSerializer.Deserialize<Vector2Int>(message.messageContent);
-                        if (!chunks.ContainsKey(v))
-                        {
-                            Chunk c = new Chunk(v);
-                            chunks.TryAdd(v, c);
-                            c.InitMap(v);
-                         //   world = new Chunk(new Vector2Int(0, 0));
-                          //  world.InitMap(new Vector2Int(0, 0));
-                            SendToClient(s, new Message("WorldData", JsonSerializer.ToJsonString(c)));
-                        }
-                        else
-                        {
-                             SendToClient(s, new Message("WorldData", JsonSerializer.ToJsonString(chunks[v])));
-                        }
-                        
-                        break;
-                        //message content type:blockmodifydata
-                        case "UpdateChunk":
-                        BlockModifyData b = JsonSerializer.Deserialize<BlockModifyData>(message.messageContent);
-                        if (GetChunk(Vec3ToChunkPos(new Vector3(b.x,b.y,b.z)))==null)
-                        {
-                        SendToClient(s, new Message("ChunkNotFound", "ChunkNotFound"));
-                        }
-                        else
-                        {
-                            Vector2Int x= Vec3ToChunkPos(new Vector3(b.x, b.y, b.z));
-                            Vector3 chunkSpacePos =new Vector3(b.x,b.y,b.z)-new Vector3(x.x,0,x.y);
-                            GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z] = b.convertType;
-                            CastToAllClients( new Message("WorldData", JsonSerializer.ToJsonString(GetChunk(x))));
-                        }
-                            
-                            
-                        
-                        
-                        break;
-                        case "LogOut":
-                        UserLogout(s);
-                        break;
-                        //message content type:userdata
-                        case "UpdateUser":
-                             UserData u = JsonSerializer.Deserialize<UserData>(message.messageContent);
-                       
-                           
-                            int idx = allUserData.FindIndex(delegate (UserData pl) { return pl.userName == u.userName; });
-                            if (idx != -1)
-                            {
-                                allUserData[idx] = u;
-                           
-                            }
-                        CastToAllClients(new Message("ReturnAllUserData", JsonSerializer.ToJsonString(allUserData)));
-                        break;
-                        case "UpdateAllUser":
-                        CastToAllClients(new Message("ClientUpdateUser","update"));
-
-                        break;
-                        case "Login":
-                        UserLogin(s, message.messageContent);
-                  //  s.Send(System.Text.Encoding.Default.GetBytes(JsonSerializer.ToJsonString(new Message("LoginReturn", "Hello"))));
-                        
-                        break;
-                        default:
-                        s.Send(System.Text.Encoding.Default.GetBytes(JsonSerializer.ToJsonString(new Message("UnknownMessage", "UnknownMessage"))+'&'));
-                        break;
-            }
-            }
-            
-         
-            
-        }
-      //  return;
+        Thread executeThread = new Thread(() => ExecuteToDoList());
+        executeThread.Start();
+     //   Thread executeThread2 = new Thread(() => ExecuteToDoList());
+    //    executeThread2.Start();
+        //  return;
     }
 }

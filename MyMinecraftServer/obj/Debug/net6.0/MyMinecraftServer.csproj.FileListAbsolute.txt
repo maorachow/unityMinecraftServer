@@ -3,6 +3,10 @@ D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MyMinecraftServer.dep
 D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MyMinecraftServer.runtimeconfig.json
 D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MyMinecraftServer.dll
 D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MyMinecraftServer.pdb
+D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MessagePack.dll
+D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MessagePack.Annotations.dll
+D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\Microsoft.NET.StringTools.dll
+D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\Utf8Json.dll
 D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\Newtonsoft.Json.dll
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net6.0\MyMinecraftServer.csproj.AssemblyReference.cache
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net6.0\MyMinecraftServer.GeneratedMSBuildEditorConfig.editorconfig
@@ -15,7 +19,3 @@ D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net6.0\refint\MyMinecraftSer
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net6.0\MyMinecraftServer.pdb
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net6.0\MyMinecraftServer.genruntimeconfig.cache
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net6.0\ref\MyMinecraftServer.dll
-D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\Utf8Json.dll
-D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MessagePack.dll
-D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\MessagePack.Annotations.dll
-D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net6.0\Microsoft.NET.StringTools.dll

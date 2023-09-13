@@ -4,11 +4,12 @@ using UnityEngine;
 using Utf8Json;
 using System.Net.Sockets;
 using UnityEngine.SceneManagement;
-
+using System.Threading.Tasks;
 public class PlayerMove : MonoBehaviour
 {
     public static GameObject chunkPrefab;
     public static int viewRange=32;
+    public static float mouseSens=5f;
     public Vector3 prePos;
     public Vector3 nowPos;
     public bool isCurrentPlayer=false;
@@ -21,7 +22,7 @@ public class PlayerMove : MonoBehaviour
     public CharacterController cc;
     public Transform cameraTrans;
     public float cameraX;
-    public static void SetBlock(float x,float y,float z,int type){
+    public  static void SetBlock(float x,float y,float z,int type){
          BlockModifyData b = new BlockModifyData(x, y, z, type);
 
         NetworkProgram.SendMessageToServer(new Message("UpdateChunk",JsonSerializer.ToJsonString(b)));
@@ -31,7 +32,10 @@ public class PlayerMove : MonoBehaviour
          cc=GetComponent<CharacterController>();
          cameraTrans=GameObject.Find("Main Camera").GetComponent<Transform>();   
     }
-    void UpdateWorld(){
+    async void UpdateWorld(){
+        if(this==null){
+            return;
+        }
         for (float x = transform.position.x - viewRange; x < transform.position.x + viewRange; x += Chunk.chunkWidth)
         {
             for (float z = transform.position.z - viewRange; z < transform.position.z + viewRange; z += Chunk.chunkWidth)
@@ -46,7 +50,8 @@ public class PlayerMove : MonoBehaviour
                //     chunk.transform.position=new Vector3(chunkPos.x,0,chunkPos.y);
                //     chunk.isChunkPosInited=true;
                 //    Debug.Log("genChunk");
-                    NetworkProgram.SendMessageToServer(new Message("ChunkGen",JsonSerializer.ToJsonString(chunkPos)));
+                 await Task.Delay(10);
+                   await Task.Run(()=>{NetworkProgram.SendMessageToServer(new Message("ChunkGen",JsonSerializer.ToJsonString(chunkPos)));});
          //          WorldManager.chunksToLoad.Add(chunk);
                 }
             }
@@ -72,8 +77,8 @@ public class PlayerMove : MonoBehaviour
         NetworkProgram.currentPlayer.rotY=transform.eulerAngles.y;     
 
 
-        float x = Input.GetAxis("Mouse X");
-        float y = Input.GetAxis("Mouse Y");
+        float x = Input.GetAxis("Mouse X")*mouseSens;
+        float y = Input.GetAxis("Mouse Y")*mouseSens;
         cameraX-=y;
        // float cameraX=cameraTrans.localEulerAngles.x+y;
         cameraX=Mathf.Clamp(cameraX,-90f,90f);
@@ -96,7 +101,7 @@ public class PlayerMove : MonoBehaviour
             }
             
         if(Input.GetMouseButton(0)&&breakBlockCD<=0f){
-            breakBlockCD=0.2f;
+            breakBlockCD=0.3f;
             BreakBlock();
         }
 

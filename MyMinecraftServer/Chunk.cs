@@ -134,7 +134,7 @@ namespace MyMinecraftServer
         }
 
      
-        public void InitMap(Vector2Int chunkPos)
+        public async Task InitMap(Vector2Int chunkPos)
         {
             map = new int[chunkWidth + 2, chunkHeight + 2, chunkWidth + 2];
             if(worldGenMode == 1)

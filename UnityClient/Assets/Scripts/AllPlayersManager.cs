@@ -48,11 +48,12 @@ public class AllPlayersManager : MonoBehaviour
     }
     void Awake(){
         playerPrefab=Resources.Load<GameObject>("Prefabs/player");
+        
     }
     // Start is called before the first frame update
     void Start()
     {
-        
+        InitPlayerManager();
     }
     void FixedUpdate(){
        
