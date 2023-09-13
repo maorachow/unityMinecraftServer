@@ -1,0 +1,11 @@
+<Project>
+  <ItemGroup>
+    <!-- ignore compilation temp files and unity generated .meta files -->
+    <None Remove="**/bin/**;**/obj/**;**/*.meta" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove($(MSBuildThisFile), $(MSBuildThisFileDirectory)..))" />
+</Project>
