@@ -160,7 +160,7 @@ public class NetworkProgram : MonoBehaviour
     {
         while (IsSocketAvaliable(clientSocket))
         {
-            Thread.Sleep(10);
+          //  Thread.Sleep(10);
             try
             {
             byte[] data = new byte[1024000];

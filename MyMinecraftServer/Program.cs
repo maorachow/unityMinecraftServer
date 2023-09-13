@@ -119,7 +119,7 @@ class Program
     {
         Socket s = (Socket)socket;
         byte[] bb = new byte[102400];
-        ArraySegment<byte> b= new ArraySegment<byte>(bb);
+      //  ArraySegment<byte> b= new ArraySegment<byte>(bb);
         while(true)
         {
             try
@@ -129,12 +129,12 @@ class Program
                     Console.WriteLine("Recieve client failed:socket closed");
                     return;
                 }
-                int count =await s.ReceiveAsync(b,new SocketFlags());
+                int count =s.Receive(bb);
                 if (count>65536)
                 {
                     UserLogout(s);
                 }
-                string str = System.Text.Encoding.UTF8.GetString(b.ToArray(),0,count);
+                string str = System.Text.Encoding.UTF8.GetString(bb.ToArray(),0,count);
                 foreach (string x in str.Split('&'))
                 {
                       if (x.Length > 0)
@@ -243,7 +243,7 @@ class Program
     }
     static void ServerConsoleControl()
     {
-        Console.WriteLine("Press 1 to list players,press 2 to list chunks");
+        Console.WriteLine("Press 1 to list players,press 2 to list chunks,press 3 to get current message count");
         while(true)
         {
 
@@ -264,6 +264,10 @@ class Program
                         
                     
                     break;
+                case '3':
+                    Console.WriteLine("\nMessage Count:"+toDoList.Count.ToString());
+                    break;
+                        
            
         }
         }
@@ -280,7 +284,7 @@ class Program
        
                 Socket s;
                 Message message;
-                Thread.Sleep(10);
+               // Thread.Sleep(10);
                 //  byte[] recieve = new byte[1024];
                 if (toDoList.Count > 0)
                 {
