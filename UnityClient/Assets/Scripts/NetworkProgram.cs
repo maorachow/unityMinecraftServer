@@ -4,7 +4,7 @@ using UnityEngine;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
-using Utf8Json;
+using Newtonsoft.Json;
 using System.Threading;
 using System.Text;
 using System;
@@ -81,7 +81,7 @@ public class NetworkProgram : MonoBehaviour
     public static bool isGoingToQuitGame=false;
 
     public static void ClientUpdateUserInfo(){
-        Message m=new Message("UpdateUser", JsonSerializer.ToJsonString(currentPlayer));
+        Message m=new Message("UpdateUser", JsonConvert.SerializeObject(currentPlayer));
         SendMessageToServer(m);
     }
 
@@ -98,8 +98,8 @@ public class NetworkProgram : MonoBehaviour
                 return;
             }
             currentPlayer = new UserData(UnityEngine.Random.Range(-1f,1f) * 10f+15f, 100f, UnityEngine.Random.Range(-1f,1f) * 10f+15f, UnityEngine.Random.Range(-1f,1f)  * 10f, clientUserName);
-            SendMessageToServer(new Message("Login", JsonSerializer.ToJsonString(currentPlayer)));
-         //   SendMessageToServer(new Message("ChunkGen", JsonSerializer.ToJsonString(new Vector2Int(0,0))));
+            SendMessageToServer(new Message("Login", JsonConvert.SerializeObject(currentPlayer)));
+         //   SendMessageToServer(new Message("ChunkGen", JsonConvert.SerializeObject(new Vector2Int(0,0))));
             isGoingToQuitGame=false;
             Thread thread = new Thread(new ThreadStart(RecieveServer));
             thread.Start();
@@ -133,7 +133,7 @@ public class NetworkProgram : MonoBehaviour
                         UnityEngine.Debug.Log("Server:"+ m.messageContent);
                         break;
                     case "WorldData":
-                    ChunkData cd=JsonSerializer.Deserialize<ChunkData>(m.messageContent);
+                    ChunkData cd=JsonConvert.DeserializeObject<ChunkData>(m.messageContent);
                     if(!Chunk.chunks.ContainsKey(cd.chunkPos)){
                         break;
                     }else{
@@ -147,7 +147,7 @@ public class NetworkProgram : MonoBehaviour
                         break;
                     case "ReturnAllUserData":
                //     Debug.Log("datareturn");
-                        AllPlayersManager.clientPlayerList=JsonSerializer.Deserialize<List<UserData>>(m.messageContent);
+                        AllPlayersManager.clientPlayerList=JsonConvert.DeserializeObject<List<UserData>>(m.messageContent);
                     break;
                     default:
                         UnityEngine.Debug.Log("Client: Unknown Message Type:"+m.messageType);
@@ -163,7 +163,7 @@ public class NetworkProgram : MonoBehaviour
           //  Thread.Sleep(10);
             try
             {
-            byte[] data = new byte[1024000];
+            byte[] data = new byte[10240000];
            // clientSocket.Receive(data);
                 int count = clientSocket.Receive(data);
                 string str = System.Text.Encoding.UTF8.GetString(data, 0, count);
@@ -174,10 +174,10 @@ public class NetworkProgram : MonoBehaviour
                    
                 if (s.Length > 0) {
                   //   Debug.Log(s);
-                  if(s.Length>1024000){
+                  if(s.Length>10240000){
                     continue;
                   }
-                        Message m=JsonSerializer.Deserialize<Message>(s);
+                        Message m=JsonConvert.DeserializeObject<Message>(s);
                         toDoList.Enqueue(m);
                     
                     }
@@ -202,7 +202,7 @@ public class NetworkProgram : MonoBehaviour
     {
         try
         {
-            clientSocket.Send(System.Text.Encoding.UTF8.GetBytes(JsonSerializer.ToJsonString(m)+'&'));
+            clientSocket.Send(System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(m)+'&'));
     //        clientSocket.Send(System.Text.Encoding.UTF8.GetBytes("&"));
         }
         catch(Exception e)

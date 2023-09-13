@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Utf8Json;
+using Newtonsoft.Json;
 using System.Net.Sockets;
 using UnityEngine.SceneManagement;
 using System.Threading.Tasks;
@@ -25,14 +25,14 @@ public class PlayerMove : MonoBehaviour
     public  static void SetBlock(float x,float y,float z,int type){
          BlockModifyData b = new BlockModifyData(x, y, z, type);
 
-        NetworkProgram.SendMessageToServer(new Message("UpdateChunk",JsonSerializer.ToJsonString(b)));
+        NetworkProgram.SendMessageToServer(new Message("UpdateChunk",JsonConvert.SerializeObject(b)));
     }
     void Start(){
         chunkPrefab=Resources.Load<GameObject>("Prefabs/chunk");
          cc=GetComponent<CharacterController>();
          cameraTrans=GameObject.Find("Main Camera").GetComponent<Transform>();   
     }
-    async void UpdateWorld(){
+     async void UpdateWorld(){
         if(this==null){
             return;
         }
@@ -50,8 +50,8 @@ public class PlayerMove : MonoBehaviour
                //     chunk.transform.position=new Vector3(chunkPos.x,0,chunkPos.y);
                //     chunk.isChunkPosInited=true;
                 //    Debug.Log("genChunk");
-                 await Task.Delay(10);
-                   await Task.Run(()=>{NetworkProgram.SendMessageToServer(new Message("ChunkGen",JsonSerializer.ToJsonString(chunkPos)));});
+                 await Task.Delay(30);
+                 await Task.Run(()=>NetworkProgram.SendMessageToServer(new Message("ChunkGen",JsonConvert.SerializeObject(chunkPos)));)
          //          WorldManager.chunksToLoad.Add(chunk);
                 }
             }
@@ -95,7 +95,7 @@ public class PlayerMove : MonoBehaviour
     //    Debug.Log(new Vector3(NetworkProgram.currentPlayer.posX,NetworkProgram.currentPlayer.posY,NetworkProgram.currentPlayer.posZ));
         cc.Move((Input.GetAxis("Horizontal")*transform.right+Input.GetAxis("Vertical")*transform.forward)*playerSpeed*Time.deltaTime);
         cc.Move(new Vector3(0f,playerY,0f)*Time.deltaTime);
-  //      NetworkProgram.SendMessageToServer(new Message("UpdatesUer", JsonSerializer.ToJsonString(NetworkProgram.currentPlayer)));
+  //      NetworkProgram.SendMessageToServer(new Message("UpdatesUer", JsonConvert.SerializeObject(NetworkProgram.currentPlayer)));
             if(breakBlockCD>0f){
              breakBlockCD-=Time.deltaTime;   
             }

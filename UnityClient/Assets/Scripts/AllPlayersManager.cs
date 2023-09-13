@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
-
+using Newtonsoft.Json;
 public class AllPlayersManager : MonoBehaviour
 {
     public static Dictionary<string,GameObject> playerPrefabsInClient=new Dictionary<string,GameObject>();
@@ -23,6 +23,7 @@ public class AllPlayersManager : MonoBehaviour
         for(int i=0;i<toDestroy.Count;i++){
             Destroy(toDestroy[i].Value);
             playerPrefabsInClient.Remove(toDestroy[i].Key);
+            return;
         }
     }
     public void UpdateAllPLayers(){
@@ -34,7 +35,7 @@ public class AllPlayersManager : MonoBehaviour
                 GameObject a=Instantiate(playerPrefab,new Vector3(u.posX,u.posY,u.posZ),Quaternion.Euler(0f,u.rotY,0f));
                 playerPrefabsInClient.Add(u.userName,a);
             }
-            if(u.userName==NetworkProgram.clientUserName){playerPrefabsInClient[u.userName].GetComponent<PlayerMove>().isCurrentPlayer=true;playerPrefabsInClient[u.userName].transform.GetChild(0).GetChild(0).GetComponent<TMP_Text>().text=u.userName; continue;}
+            if(u.userName==NetworkProgram.clientUserName){playerPrefabsInClient[u.userName].GetComponent<PlayerMove>().isCurrentPlayer=true; continue;}
          //   Debug.Log(new Vector3(u.posX,u.posY,u.posZ));
             playerPrefabsInClient[u.userName].GetComponent<CharacterController>().enabled=false;
             playerPrefabsInClient[u.userName].transform.position=new Vector3(u.posX,u.posY,u.posZ);
