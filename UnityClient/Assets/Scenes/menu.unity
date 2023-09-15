@@ -243,6 +243,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startGameButton: {fileID: 0}
   playerNameField: {fileID: 0}
+  IPField: {fileID: 0}
 --- !u!1 &308406862
 GameObject:
   m_ObjectHideFlags: 0
@@ -619,7 +620,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 90
   orthographic: 0
   orthographic size: 5
   m_Depth: -1

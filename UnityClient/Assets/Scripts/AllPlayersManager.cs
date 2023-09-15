@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using Newtonsoft.Json;
+using MessagePack;
 public class AllPlayersManager : MonoBehaviour
 {
+    public static bool isPlayerDataUpdated=false;
     public static Dictionary<string,GameObject> playerPrefabsInClient=new Dictionary<string,GameObject>();
     public static GameObject playerPrefab;
     public static List<UserData> clientPlayerList=new List<UserData>();
@@ -51,18 +53,18 @@ public class AllPlayersManager : MonoBehaviour
         playerPrefab=Resources.Load<GameObject>("Prefabs/player");
         
     }
-    // Start is called before the first frame update
+   
     void Start()
     {
         InitPlayerManager();
     }
-    void FixedUpdate(){
-       
-        
-    }
-    // Update is called once per frame
-    void Update()
-    {   RemovePlayer();
+
+    void Update(){
+     //    if(isPlayerDataUpdated==true){
+        RemovePlayer();
          UpdateAllPLayers();
+         isPlayerDataUpdated=false;
+     //   }
     }
+  
 }

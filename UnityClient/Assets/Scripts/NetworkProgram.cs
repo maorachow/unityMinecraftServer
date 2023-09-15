@@ -11,20 +11,28 @@ using System;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Numerics;
-
+using MessagePack;
+[MessagePackObject]
 public class ChunkData{
+    [Key(0)]
     public int[,,] map;
+    [Key(1)]
     public Vector2Int chunkPos=new Vector2Int(0,0);
     public ChunkData(int[,,] map,Vector2Int chunkPos){
         this.map=map;
         this.chunkPos=chunkPos;
     }
 }
+[MessagePackObject]
 public class BlockModifyData
 {
+    [Key(0)]
     public float x;
+    [Key(1)]
     public float y;
+    [Key(2)]
     public float z;
+    [Key(3)]
     public int convertType;
 
     public BlockModifyData(float x, float y, float z, int convertType)
@@ -35,14 +43,18 @@ public class BlockModifyData
         this.convertType = convertType;
     }
 }
-
+[MessagePackObject]
 public class UserData  
 {
+    [Key(0)]
     public float posX;
-    
+    [Key(1)]
     public float posY;
+    [Key(2)]
    public float posZ;
+   [Key(3)]
    public float rotY;
+   [Key(4)]
    public string userName;
 
     public UserData(float posX, float posY, float posZ, float rotY, string userName)
@@ -61,8 +73,8 @@ public class UserData
 public class Message
 {
     public string messageType;
-    public string messageContent;
-   public Message(string messageType, string messageContent)
+    public byte[] messageContent;
+   public Message(string messageType, byte[] messageContent)
  {
      this.messageType = messageType;
      this.messageContent = messageContent;
@@ -71,6 +83,7 @@ public class Message
 
 public class NetworkProgram : MonoBehaviour
 {
+    public static MessagePackSerializerOptions lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
  //   public static Dictionary<Vector2Int,Chunk> chunks=new Dictionary<Vector2Int,Chunk>();
     public static Queue<Message> toDoList=new Queue<Message>();
     public static UserData currentPlayer;
@@ -81,7 +94,7 @@ public class NetworkProgram : MonoBehaviour
     public static bool isGoingToQuitGame=false;
 
     public static void ClientUpdateUserInfo(){
-        Message m=new Message("UpdateUser", JsonConvert.SerializeObject(currentPlayer));
+        Message m=new Message("UpdateUser", MessagePackSerializer.Serialize(currentPlayer,lz4Options));
         SendMessageToServer(m);
     }
 
@@ -98,8 +111,8 @@ public class NetworkProgram : MonoBehaviour
                 return;
             }
             currentPlayer = new UserData(UnityEngine.Random.Range(-1f,1f) * 10f+15f, 100f, UnityEngine.Random.Range(-1f,1f) * 10f+15f, UnityEngine.Random.Range(-1f,1f)  * 10f, clientUserName);
-            SendMessageToServer(new Message("Login", JsonConvert.SerializeObject(currentPlayer)));
-         //   SendMessageToServer(new Message("ChunkGen", JsonConvert.SerializeObject(new Vector2Int(0,0))));
+            SendMessageToServer(new Message("Login", MessagePackSerializer.Serialize(currentPlayer,lz4Options)));
+         //   SendMessageToServer(new Message("ChunkGen", MessagePackSerializer.Serialize(new Vector2Int(0,0))));
             isGoingToQuitGame=false;
             Thread thread = new Thread(new ThreadStart(RecieveServer));
             thread.Start();
@@ -124,7 +137,11 @@ public class NetworkProgram : MonoBehaviour
                         ClientUpdateUserInfo();
                         break;
                     case "LoginReturn":
-                        UnityEngine.Debug.Log("Server:" + m.messageContent);
+                        UnityEngine.Debug.Log("Server:" + MessagePackSerializer.Deserialize<string>(m.messageContent));
+                        if(MessagePackSerializer.Deserialize<string>(m.messageContent,lz4Options)=="Failed"){
+                              GameLauncher.returnToMenuTextContent="Failed connecting: a player with the same name has joined the world.";
+                        }
+
                         break;
                     case "userCount":
                         UnityEngine.Debug.Log("Server:" + m.messageContent);
@@ -133,23 +150,25 @@ public class NetworkProgram : MonoBehaviour
                         UnityEngine.Debug.Log("Server:"+ m.messageContent);
                         break;
                     case "WorldData":
-                    ChunkData cd=JsonConvert.DeserializeObject<ChunkData>(m.messageContent);
+                    ChunkData cd= MessagePackSerializer.Deserialize<ChunkData>(m.messageContent,lz4Options);
                     if(!Chunk.chunks.ContainsKey(cd.chunkPos)){
                         break;
                     }else{
                    
                         Chunk.chunks[cd.chunkPos].map=cd.map;
                         Chunk.chunks[cd.chunkPos].isChunkUpdated=true;
-                        
+                         Chunk.chunks[cd.chunkPos].isChunkDataDownloaded=true;
+                        Chunk.chunks[cd.chunkPos].isWaitingForNewChunkData=false;
                     }
                       
                             
                         break;
                     case "ReturnAllUserData":
                //     Debug.Log("datareturn");
-                        AllPlayersManager.clientPlayerList=JsonConvert.DeserializeObject<List<UserData>>(m.messageContent);
-                    break;
-                    default:
+                        AllPlayersManager.clientPlayerList= MessagePackSerializer.Deserialize<List<UserData>>(m.messageContent,lz4Options);
+                        AllPlayersManager.isPlayerDataUpdated=true;
+                        break;
+                        default:
                         UnityEngine.Debug.Log("Client: Unknown Message Type:"+m.messageType);
                         break;
                         }
@@ -173,12 +192,17 @@ public class NetworkProgram : MonoBehaviour
                 {
                    
                 if (s.Length > 0) {
-                  //   Debug.Log(s);
-                  if(s.Length>10240000){
+                    Debug.Log(s);
+                    if(s.Length>10240000){
                     continue;
-                  }
-                        Message m=JsonConvert.DeserializeObject<Message>(s);
+                    }
+                        try{
+                             Message m=JsonConvert.DeserializeObject<Message>(s);
                         toDoList.Enqueue(m);
+                        }catch{
+                                Debug.Log("Incomplete message");
+                        }
+                       
                     
                     }
                 }
@@ -226,10 +250,7 @@ public class NetworkProgram : MonoBehaviour
             return (int)f - 1;
         }
     }
-    public void StartGameButtonOnClick(){
 
-             
-    }
     
        
 
@@ -249,7 +270,7 @@ public class NetworkProgram : MonoBehaviour
         ToDoListExecute();
     }
     void OnDestroy(){
-        SendMessageToServer(new Message("LogOut","null"));
+        SendMessageToServer(new Message("LogOut",MessagePackSerializer.Serialize("null",lz4Options)));
         //clientSocket.Close();
     }
 }
