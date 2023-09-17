@@ -8,7 +8,8 @@ using Newtonsoft.Json;
 using MessagePack;
 using System.Runtime.Serialization;
 using System.Runtime.CompilerServices;
-
+using System.Collections;
+using System.Net.Sockets;
 namespace MyMinecraftServer
 {
     [MessagePackObject]
@@ -115,7 +116,15 @@ namespace MyMinecraftServer
             this.y = y;
             this.z = z;
         }
-
+        public static int FloorToInt(float f) { return (int)Math.Floor(f); }
+        public static Vector3Int FloorToIntVec3(Vector3 v)
+        {
+            return new Vector3Int(
+                FloorToInt(v.X),
+                FloorToInt(v.Y),
+               FloorToInt(v.Z)
+            );
+        }
         public static Vector3Int operator +(Vector3Int b, Vector3Int c)
         {
             Vector3Int v = new Vector3Int(b.x + c.x, b.y + c.y, b.z + c.z);
@@ -212,6 +221,207 @@ namespace MyMinecraftServer
         public ChunkData ChunkToChunkData()
         {
             return new ChunkData(this.map, this.chunkPos);
+        }
+        public int updateCount = 0;
+        public bool BFSIsWorking = false;
+        public bool[,,] mapIsSearched;
+        public void BFSInit(int x, int y, int z, int ignoreSide, int GainedUpdateCount)
+        {
+            updateCount = GainedUpdateCount;
+            mapIsSearched = new bool[chunkWidth + 2, chunkHeight + 2, chunkWidth + 2];
+            BFSIsWorking = true;
+            Task.Run(()=>BFSMapUpdate(x, y, z, ignoreSide));
+        }
+        public async void BFSMapUpdate(int x, int y, int z, int ignoreSide)
+        {
+            //left right bottom top back front
+            //left x-1 right x+1 top y+1 bottom y-1 back z-1 front z+1
+           // Task.Delay(30);
+            if (!BFSIsWorking)
+            {
+                return;
+            }
+            if (updateCount > 32)
+            {
+
+         //       Program.CastToAllClients(new Message("WorldData", MessagePackSerializer.Serialize(this.ChunkToChunkData())));
+                BFSIsWorking = false;
+                return;
+            }
+          
+                mapIsSearched[x, y, z] = true;
+     
+            try
+            {
+            if (GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z)) == 101 && GetBlock(new Vector3(chunkPos.x + x, y - 1, chunkPos.y + z)) == 0)
+            {
+                BreakBlockAtPoint(new Vector3(chunkPos.x + x, y, chunkPos.y + z));
+            }
+            if (GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z)) == 100 && GetBlock(new Vector3(chunkPos.x + x, y - 1, chunkPos.y + z)) == 0)
+            {
+                SetBlockWithUpdate(new Vector3(chunkPos.x + x, y - 1, chunkPos.y + z), 100);
+            }
+
+            if (GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z)) == 100 && GetBlock(new Vector3(chunkPos.x + x - 1, y, chunkPos.y + z)) == 0)
+            {
+                SetBlockWithUpdate(new Vector3(chunkPos.x + x - 1, y, chunkPos.y + z), 100);
+            }
+            if (GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z)) == 100 && GetBlock(new Vector3(chunkPos.x + x + 1, y, chunkPos.y + z)) == 0)
+            {
+                SetBlockWithUpdate(new Vector3(chunkPos.x + x + 1, y, chunkPos.y + z), 100);
+            }
+            if (GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z)) == 100 && GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z - 1)) == 0)
+            {
+                SetBlockWithUpdate(new Vector3(chunkPos.x + x, y, chunkPos.y + z - 1), 100);
+            }
+            if (GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z)) == 100 && GetBlock(new Vector3(chunkPos.x + x, y, chunkPos.y + z + 1)) == 0)
+            {
+                SetBlockWithUpdate(new Vector3(chunkPos.x + x, y, chunkPos.y + z + 1), 100);
+            }
+            }
+            catch
+            {
+                Console.WriteLine("outbound update");
+            }
+           
+            updateCount++;
+            if (!(ignoreSide == 0) && x - 1 >= 0)
+            {
+                try
+                {
+                if (!mapIsSearched[x - 1, y, z] && map[x - 1, y, z] != 0)
+                    Task.Run(() => BFSMapUpdate(x - 1, y, z, ignoreSide));
+                }
+                catch
+                {
+                    Console.WriteLine("outbound update");
+                }
+               
+            }
+            else if (x - 1 < 0)
+            {
+
+                if (leftChunk != null)
+                {
+                    leftChunk.BFSInit(chunkWidth - 1, y, z, ignoreSide, updateCount);
+                }
+            }
+            if (!(ignoreSide == 1) && x + 1 < chunkWidth)
+            {
+                try
+                {
+                    if (!mapIsSearched[x + 1, y, z] && map[x + 1, y, z] != 0)
+                        Task.Run(() => BFSMapUpdate(x + 1, y, z, ignoreSide));
+                }
+                catch
+                {
+                    Console.WriteLine("outbound update");
+                }
+            }
+            else if (x + 1 >= chunkWidth)
+            {
+                if (rightChunk != null)
+                {
+                    rightChunk.BFSInit(0, y, z, ignoreSide, updateCount);
+                }
+            }
+            if (!(ignoreSide == 2) && y - 1 >= 0)
+            {
+                try
+                {
+                    if (!mapIsSearched[x, y - 1, z] && map[x, y - 1, z] != 0)
+                        Task.Run(() => BFSMapUpdate(x, y - 1, z, ignoreSide));
+
+                }
+                catch
+                {
+                    Console.WriteLine("outbound update");
+                }
+            }
+            if (!(ignoreSide == 3) && y + 1 < chunkHeight)
+            {
+                try
+                {
+                    if (!mapIsSearched[x, y + 1, z] && map[x, y + 1, z] != 0)
+                        Task.Run(() => BFSMapUpdate(x, y + 1, z, ignoreSide));
+                }
+                catch
+                {
+                    Console.WriteLine("outbound update");
+                }
+            }
+            if (!(ignoreSide == 4) && z - 1 >= 0)
+            {
+                try
+                {
+                    if (!mapIsSearched[x, y, z - 1] && map[x, y, z - 1] != 0)
+                        Task.Run(() => BFSMapUpdate(x, y, z - 1, ignoreSide));
+                }
+                catch { Console.WriteLine("outbound update"); }
+            }
+            else if (z - 1 < 0)
+            {
+                if (backChunk != null)
+                {
+                    backChunk.BFSInit(x, y, chunkWidth - 1, ignoreSide, updateCount);
+                }
+            }
+            if (!(ignoreSide == 5) && z + 1 < chunkWidth)
+            {
+                try
+                {
+                    if (!mapIsSearched[x, y, z + 1] && map[x, y, z + 1] != 0)
+                        Task.Run(() => BFSMapUpdate(x, y, z + 1, ignoreSide));
+                }catch {
+                    Console.WriteLine("outbound update");
+                }
+            }
+            else if (z + 1 >= chunkWidth)
+            {
+                if (frontChunk != null)
+                {
+                    frontChunk.BFSInit(x, y, 0, ignoreSide, updateCount);
+                }
+            }
+
+        }
+        public void BreakBlockAtPoint(Vector3 blockPoint)
+        {
+
+
+          
+            Chunk.SetBlockWithUpdate(blockPoint, 0);
+          
+        }
+        public static int GetBlock(Vector3 pos)
+        {
+            Vector3Int intPos = Vector3Int.FloorToIntVec3(pos);
+            Chunk chunkNeededUpdate = Program.GetChunk(Program.Vec3ToChunkPos(pos));
+       //     if (chunkNeededUpdate == null)
+      //      {
+       //         return -1;
+       //     }
+            Vector3Int chunkSpacePos = intPos - new Vector3Int(chunkNeededUpdate.chunkPos.x,0,chunkNeededUpdate.chunkPos.y);
+            if(chunkSpacePos.x >= 0 && chunkSpacePos.x<chunkWidth&&chunkSpacePos.y<chunkHeight && chunkSpacePos.y >=0 && chunkSpacePos.z >= 0 && chunkSpacePos.z < chunkWidth)
+            {
+            return chunkNeededUpdate.map[chunkSpacePos.x, chunkSpacePos.y, chunkSpacePos.z];
+            }
+            else
+            {
+                return 0;
+            }
+           
+        }
+        public static void SetBlockWithUpdate(Vector3 pos, int blockID)
+        {
+
+            Vector3Int intPos = new Vector3Int(Program.FloatToInt(pos.X), Program.FloatToInt(pos.Y), Program.FloatToInt(pos.Z));
+            Chunk chunkNeededUpdate = Program.GetChunk(Program.Vec3ToChunkPos(pos));
+
+            Vector3Int chunkSpacePos = intPos - new Vector3Int(chunkNeededUpdate.chunkPos.x,0,chunkNeededUpdate.chunkPos.y);
+          //  chunkNeededUpdate.map[chunkSpacePos.x, chunkSpacePos.y, chunkSpacePos.z] = blockID;
+            BlockModifyData b = new BlockModifyData(pos.X, pos.Y, pos.Z , blockID);
+            Program.toDoList.Enqueue(new KeyValuePair<Socket, Message>(null, new Message("UpdateChunkInternal", MessagePackSerializer.Serialize(b))), 0);
         }
         public async Task InitMap(Vector2Int chunkPos)
         {

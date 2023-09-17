@@ -10,7 +10,7 @@ using System.Text;
 using System;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using System.Numerics;
+
 using MessagePack;
 [MessagePackObject]
 public class ChunkData{
@@ -23,6 +23,28 @@ public class ChunkData{
         this.chunkPos=chunkPos;
     }
 }
+[MessagePackObject]
+public class ParticleData
+{
+    [Key(0)]
+    public float posX;
+    [Key(1)]
+    public float posY;
+    [Key(2)]
+    public float posZ;
+    [Key(3)]
+    public int type;
+
+    public ParticleData(float posX, float posY, float posZ, int type)
+    {
+        this.posX = posX;
+        this.posY = posY;
+        this.posZ = posZ;
+        this.type = type;
+    }
+}
+
+
 [MessagePackObject]
 public class BlockModifyData
 {
@@ -82,7 +104,7 @@ public class Message
 }
 
 public class NetworkProgram : MonoBehaviour
-{
+{ 
     public static MessagePackSerializerOptions lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
  //   public static Dictionary<Vector2Int,Chunk> chunks=new Dictionary<Vector2Int,Chunk>();
     public static Queue<Message> toDoList=new Queue<Message>();
@@ -97,7 +119,9 @@ public class NetworkProgram : MonoBehaviour
         Message m=new Message("UpdateUser", MessagePackSerializer.Serialize(currentPlayer,lz4Options));
         SendMessageToServer(m);
     }
-
+    public static UnityEngine.Vector3 SysVec3ToUnityVec3(System.Numerics.Vector3 v){
+        return new UnityEngine.Vector3(v.X,v.Y,v.Z);
+    }
     public static void InitNetwork(){
         Chunk.chunks=new Dictionary<Vector2Int,Chunk>();
         toDoList=new Queue<Message>();
@@ -130,6 +154,10 @@ public class NetworkProgram : MonoBehaviour
         }
         if(toDoList.Count>0){
             Message m=toDoList.Peek();
+            if(m==null){
+                Debug.Log("Empty message");
+                   toDoList.Dequeue();
+            }
             switch (m.messageType)
                         {
                     case "ClientUpdateUser":
@@ -162,7 +190,28 @@ public class NetworkProgram : MonoBehaviour
                     }
                       
                             
+                    break;
+                    case "ClientModifyChunk":
+                    BlockModifyData b = MessagePackSerializer.Deserialize<BlockModifyData>(m.messageContent,lz4Options);
+                    Vector2Int cPos = Chunk.Vec3ToChunkPos(new Vector3(b.x, b.y, b.z));
+                    Vector3 chunkSpacePos = new Vector3(b.x, b.y, b.z) - new Vector3(cPos.x, 0, cPos.y);
+                    if(Chunk.GetChunk(cPos) == null){
                         break;
+                    }else{
+                   
+                        Chunk.chunks[cPos].map[(int)chunkSpacePos.x,(int)chunkSpacePos.y,(int)chunkSpacePos.z]=b.convertType;
+                        Chunk.chunks[cPos].isChunkUpdated=true;
+                         Chunk.chunks[cPos].isChunkDataDownloaded=true;
+                        Chunk.chunks[cPos].isWaitingForNewChunkData=false;
+                    }
+                      
+                            
+                        break;
+                    case "EmitParticle":
+                    Debug.Log("emit");
+                    ParticleData pd=MessagePackSerializer.Deserialize<ParticleData>(m.messageContent,lz4Options);
+                    particleAndEffectBeh.SpawnParticle(new UnityEngine.Vector3(pd.posX,pd.posY,pd.posZ),pd.type);
+                    break;
                     case "ReturnAllUserData":
                //     Debug.Log("datareturn");
                         AllPlayersManager.clientPlayerList= MessagePackSerializer.Deserialize<List<UserData>>(m.messageContent,lz4Options);
@@ -192,13 +241,13 @@ public class NetworkProgram : MonoBehaviour
                 {
                    
                 if (s.Length > 0) {
-                    Debug.Log(s);
+                    Debug.Log(s.Length);
                     if(s.Length>10240000){
                     continue;
                     }
                         try{
                              Message m=JsonConvert.DeserializeObject<Message>(s);
-                        toDoList.Enqueue(m);
+                            toDoList.Enqueue(m);
                         }catch{
                                 Debug.Log("Incomplete message");
                         }
@@ -210,7 +259,7 @@ public class NetworkProgram : MonoBehaviour
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Connection Lost"+e);
+                UnityEngine.Debug.Log("Connection Lost: "+e);
                 
                  clientSocket.Close();
                  isGoingToQuitGame=true;

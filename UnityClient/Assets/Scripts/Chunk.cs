@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using MessagePack;
 public class Chunk : MonoBehaviour
 {
+    public bool isChunkBuilding=false;
     public bool isChunkUpdated=false;
     public bool isWaitingForNewChunkData=false;
    public static FastNoise noiseGenerator=new FastNoise();
@@ -76,6 +77,7 @@ public class Chunk : MonoBehaviour
 
     public static void AddBlockInfo(){
         //left right bottom top back front
+        blockAudioDic.TryAdd(0,null);
         blockAudioDic.TryAdd(1,Resources.Load<AudioClip>("Audios/Stone_dig2"));
         blockAudioDic.TryAdd(2,Resources.Load<AudioClip>("Audios/Grass_dig1"));
         blockAudioDic.TryAdd(3,Resources.Load<AudioClip>("Audios/Gravel_dig1"));
@@ -455,7 +457,12 @@ public class Chunk : MonoBehaviour
 
     public async void BuildChunk()
     {
+        isChunkBuilding=true;
   //  Debug.Log("BuildChunk");
+    if(map==null){
+        NetworkProgram.SendMessageToServer(new Message("ChunkGen",MessagePackSerializer.Serialize(chunkPos)));
+        await Task.Delay(1000);
+    }
     chunkMesh = new Mesh();
     chunkNonSolidMesh=new Mesh();
     
@@ -475,6 +482,7 @@ public class Chunk : MonoBehaviour
     meshFilter.mesh = chunkMesh;
     meshFilterNS.mesh=chunkNonSolidMesh;
     meshCollider.sharedMesh = chunkMesh;
+    isChunkBuilding=false;
     }
 
 /*void BuildBlock(int x, int y, int z, List<Vector3> verts, List<Vector2> uvs, List<int> tris)
@@ -570,6 +578,17 @@ public class Chunk : MonoBehaviour
         tris.Add(index + 0);
     }
 }*/
+ public static int FloatToInt(float f){
+        if(f>=0){
+            return (int)f;
+        }else{
+            return (int)f-1;
+        }
+    }
+ public static Vector3Int Vec3ToBlockPos(Vector3 pos){
+        Vector3Int intPos=new Vector3Int(FloatToInt(pos.x),FloatToInt(pos.y),FloatToInt(pos.z));
+        return intPos;
+    }
     public static IEnumerator SetBlock(float x,float y,float z,int type){
         BlockModifyData b = new BlockModifyData(x, y, z, type);
          Chunk chunkNeededUpdate=GetChunk(Vec3ToChunkPos(new Vector3(x,y,z)));
@@ -595,7 +614,7 @@ public class Chunk : MonoBehaviour
             yield break;
     }
     void Update(){
-    if(isChunkUpdated==true){
+    if(isChunkUpdated==true&&isChunkBuilding==false){
         BuildChunk();
         isChunkUpdated=false;
     }

@@ -48,7 +48,26 @@ public class BlockModifyData
         this.convertType = convertType;
     }
 }
+[MessagePackObject]
+public class ParticleData
+{
+    [Key(0)]
+    public float posX;
+    [Key(1)]
+    public float posY;
+    [Key(2)]
+    public float posZ;
+    [Key(3)]
+    public int type;
 
+    public ParticleData(float posX, float posY, float posZ, int type)
+    {
+        this.posX = posX;
+        this.posY = posY;
+        this.posZ = posZ;
+        this.type = type;
+    }
+}
 
 [MessagePackObject]
 public class UserData {
@@ -85,8 +104,8 @@ public class Program
     static Chunk world;
     static Dictionary<Vector2Int,Chunk> chunks= new Dictionary<Vector2Int,Chunk>();
     static object listLock = new object();
-    static PriorityQueue<KeyValuePair<Socket, Message>, int> toDoList2 = new PriorityQueue<KeyValuePair<Socket, Message>, int>();//双线程处理消息
-    static PriorityQueue<KeyValuePair<Socket,Message>,int> toDoList=new PriorityQueue<KeyValuePair<Socket,Message>,int>();
+    public static PriorityQueue<KeyValuePair<Socket, Message>, int> toDoList2 = new PriorityQueue<KeyValuePair<Socket, Message>, int>();//双线程处理消息
+    public static PriorityQueue<KeyValuePair<Socket,Message>,int> toDoList=new PriorityQueue<KeyValuePair<Socket,Message>,int>();
     static IPAddress ip = IPAddress.Parse("0.0.0.0");
     static int port = 11111;
     static Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -122,13 +141,29 @@ public class Program
        
       
     }
+    public static Vector3Int Vec3ToBlockPos(Vector3 pos)
+    {
+        Vector3Int intPos = new Vector3Int(FloatToInt(pos.X), FloatToInt(pos.Y), FloatToInt(pos.Z));
+        return intPos;
+    }
+    public static int FloatToInt(float f)
+    {
+        if (f >= 0)
+        {
+            return (int)f;
+        }
+        else
+        {
+            return (int)f - 1;
+        }
+    }
     public static Vector2Int Vec3ToChunkPos(Vector3 pos)
     {
         Vector3 tmp = pos;
         tmp.X = MathF.Floor(tmp.X / (float)Chunk.chunkWidth) * Chunk.chunkWidth;
         tmp.Z = MathF.Floor(tmp.Z / (float)Chunk.chunkWidth) * Chunk.chunkWidth;
         Vector2Int value = new Vector2Int((int)tmp.X, (int)tmp.Z);
-        Console.WriteLine(value.x+" "+value.y+"\n");
+      //  Console.WriteLine(value.x+" "+value.y+"\n");
         return value;
     }
     public static Chunk GetChunk(Vector2Int chunkPos)
@@ -378,30 +413,30 @@ public class Program
     }
 
 
-    static async void ExecuteToDoList()
+    static async void ExecuteToDoList(PriorityQueue<KeyValuePair<Socket,Message>,int> listToExecute,object objLock)
     {
         while (true)
         {
        
                 Socket s;
                 Message message;
-                Thread.Sleep(1);
+                Thread.Sleep(5);
                 //  byte[] recieve = new byte[1024];
-                if (toDoList.Count > 0)
+                if (listToExecute.Count > 0)
                 {
-                lock (listLock)
+                lock (objLock)
                 {
 
                
-                    message = toDoList.Peek().Value;
+                    message = listToExecute.Peek().Value;
                     if (message == null)
                     {
                         Console.WriteLine("Empty Message");
-                        toDoList.Dequeue();
+                        listToExecute.Dequeue();
                         continue;
                     }
-                    s = toDoList.Peek().Key;
-                    toDoList.Dequeue();
+                    s = listToExecute.Peek().Key;
+                    listToExecute.Dequeue();
 
 
 
@@ -432,6 +467,44 @@ public class Program
                         
 
                         break;
+                        //message content type:blockmodifydata
+                        case "UpdateChunkInternal":
+                            Console.WriteLine("updateinternal");
+                            BlockModifyData binternal = MessagePackSerializer.Deserialize<BlockModifyData>(message.messageContent);
+                            if (GetChunk(Vec3ToChunkPos(new Vector3(binternal.x, binternal.y, binternal.z))) == null)
+                            {
+                               //SendToClient(s, new Message("ChunkNotFound", MessagePackSerializer.Serialize("ChunkNotFound")));
+                            }
+                            else
+                            {
+                                Vector2Int x = Vec3ToChunkPos(new Vector3(binternal.x, binternal.y, binternal.z));
+                                Vector3 chunkSpacePos = new Vector3(binternal.x, binternal.y, binternal.z) - new Vector3(x.x, 0, x.y);
+                                ParticleData pd;
+                                if (binternal.convertType == 0)
+                                {
+                                    pd = new ParticleData((binternal.x)+0.5f,(binternal.y) + 0.5f, (binternal.z) + 0.5f, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z]);
+                                    Console.WriteLine("Emit");
+                                }
+                                else
+                                {
+                                    pd = null;
+                                }
+                                GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z] = binternal.convertType;
+                           
+                                if (binternal.convertType == 0 && pd != null)
+                                {
+                                    CastToAllClients(new Message("EmitParticle", MessagePackSerializer.Serialize(pd)));
+
+                                }
+                                CastToAllClients(new Message("ClientModifyChunk", MessagePackSerializer.Serialize(binternal)));
+
+                            }
+
+
+
+
+
+                            break;
                     //message content type:blockmodifydata
                     case "UpdateChunk":
                         BlockModifyData b = MessagePackSerializer.Deserialize<BlockModifyData>(message.messageContent);
@@ -443,8 +516,25 @@ public class Program
                         {
                             Vector2Int x = Vec3ToChunkPos(new Vector3(b.x, b.y, b.z));
                             Vector3 chunkSpacePos = new Vector3(b.x, b.y, b.z) - new Vector3(x.x, 0, x.y);
-                            GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z] = b.convertType;
-                            CastToAllClients(new Message("WorldData", MessagePackSerializer.Serialize(GetChunk(x).ChunkToChunkData())));
+                                ParticleData pd;
+                                if (b.convertType == 0)
+                                {
+                                     pd = new ParticleData(b.x,b.y,b.z, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z]);
+                                    Console.WriteLine("Emit");
+                                }
+                                else
+                                {
+                                    pd = null;
+                                }
+                                GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z] = b.convertType;
+                               
+                                if (b.convertType == 0 && pd != null)
+                                {
+                                    CastToAllClients(new Message("EmitParticle", MessagePackSerializer.Serialize(pd)));
+                                    
+                                }
+                                CastToAllClients(new Message("ClientModifyChunk", MessagePackSerializer.Serialize(b)));
+                                GetChunk(x).BFSInit((int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z, 7,0);
                         }
 
 
@@ -490,7 +580,7 @@ public class Program
 
         }
     }
-    static async void ExecuteToDoList2()
+   /* static async void ExecuteToDoList2()
     {
         while (true)
         {
@@ -602,7 +692,7 @@ public class Program
 
 
         }
-    }
+    }*/
     static void Main(string[] args)
     {
         serverSocket.Bind(new IPEndPoint(ip, port));
@@ -613,9 +703,9 @@ public class Program
         Thread ServerConsoleControlThread = new Thread(() => ServerConsoleControl());
         ServerConsoleControlThread.Start();
 
-        Thread executeThread = new Thread(() => ExecuteToDoList());
+        Thread executeThread = new Thread(() => ExecuteToDoList(toDoList,listLock));
         executeThread.Start();
-        Thread executeThread2 = new Thread(() => ExecuteToDoList2());
+        Thread executeThread2 = new Thread(() => ExecuteToDoList(toDoList2, listLock2));
         executeThread2.Start();
         //   Thread executeThread2 = new Thread(() => ExecuteToDoList());
         //    executeThread2.Start();
