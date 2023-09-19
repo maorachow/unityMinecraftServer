@@ -32,13 +32,16 @@ public class AllPlayersManager : MonoBehaviour
 
         foreach(UserData u in clientPlayerList){
 
-            
+            PlayerMove pm=null;
             if(!playerPrefabsInClient.ContainsKey(u.userName)){
                 GameObject a=Instantiate(playerPrefab,new Vector3(u.posX,u.posY,u.posZ),Quaternion.Euler(0f,u.rotY,0f));
                 playerPrefabsInClient.Add(u.userName,a);
+                pm=playerPrefabsInClient[u.userName].GetComponent<PlayerMove>();
+            }else{
+                   pm=playerPrefabsInClient[u.userName].GetComponent<PlayerMove>();
             }
             if(u.userName==NetworkProgram.clientUserName){
-                playerPrefabsInClient[u.userName].GetComponent<PlayerMove>().isCurrentPlayer=true;
+               pm.isCurrentPlayer=true;
                  playerPrefabsInClient[u.userName].transform.GetChild(1).GetChild(0).GetComponent<MeshRenderer>().enabled=false;
                  continue;
                  }
@@ -46,10 +49,10 @@ public class AllPlayersManager : MonoBehaviour
          //   Debug.Log(new Vector3(u.posX,u.posY,u.posZ));
         // playerPrefabsInClient[u.userName].transform.GetChild(0).GetChild(0).GetComponent<TMP_Text>().enabled=true;
             playerPrefabsInClient[u.userName].GetComponent<CharacterController>().enabled=false;
-            playerPrefabsInClient[u.userName].transform.position=new Vector3(u.posX,u.posY,u.posZ);
-            playerPrefabsInClient[u.userName].GetComponent<PlayerMove>().isPlayerAttacking=u.isAttacking;
-            if(playerPrefabsInClient[u.userName].GetComponent<PlayerMove>().headTrans!=null){
-                playerPrefabsInClient[u.userName].GetComponent<PlayerMove>().headTrans.rotation=Quaternion.Euler(u.rotX,u.rotY,u.rotZ);
+            pm.transform.position=Vector3.Lerp( pm.transform.position,new Vector3(u.posX,u.posY,u.posZ),10f*Time.deltaTime);
+            pm.isPlayerAttacking=u.isAttacking;
+            if( pm.headTrans!=null){
+                pm.headTrans.rotation=Quaternion.Slerp( pm.headTrans.rotation,Quaternion.Euler(u.rotX,u.rotY,u.rotZ),10f*Time.deltaTime);
             }
             
             playerPrefabsInClient[u.userName].transform.GetChild(1).GetChild(0).GetComponent<TMP_Text>().text=u.userName;
