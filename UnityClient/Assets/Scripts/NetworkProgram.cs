@@ -10,7 +10,7 @@ using System.Text;
 using System;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-
+using System.Threading.Tasks;
 using MessagePack;
 [MessagePackObject]
 public class ChunkData{
@@ -66,48 +66,44 @@ public class BlockModifyData
     }
 }
 [MessagePackObject]
-public class UserData  
-{
+public class UserData {
     [Key(0)]
     public float posX;
     [Key(1)]
     public float posY;
     [Key(2)]
-   public float posZ;
-   [Key(3)]
-   public float rotY;
-   [Key(4)]
-   public string userName;
+    public float posZ;
+    [Key(3)]
+    public float rotX;
+    [Key(4)]
+    public float rotY;
+    [Key(5)]
+    public float rotZ;
+    [Key(6)]
+    public string userName;
+    [Key(7)]
+    public bool isAttacking;
 
-    public UserData(float posX, float posY, float posZ, float rotY, string userName)
+    public UserData(float posX, float posY, float posZ, float rotX, float rotY, float rotZ, string userName, bool isAttacking)
     {
         this.posX = posX;
         this.posY = posY;
         this.posZ = posZ;
+        this.rotX = rotX;
         this.rotY = rotY;
+        this.rotZ = rotZ;
         this.userName = userName;
+        this.isAttacking = isAttacking;
     }
-
-
-    //  Quaternion rotation;
 }
 
-public class Message
-{
-    public string messageType;
-    public byte[] messageContent;
-   public Message(string messageType, byte[] messageContent)
- {
-     this.messageType = messageType;
-     this.messageContent = messageContent;
- }
-}
 
 public class NetworkProgram : MonoBehaviour
 { 
+    public static object listLock=new object();
     public static MessagePackSerializerOptions lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
  //   public static Dictionary<Vector2Int,Chunk> chunks=new Dictionary<Vector2Int,Chunk>();
-    public static Queue<Message> toDoList=new Queue<Message>();
+    public static Queue<MessageProtocol> toDoList=new Queue<MessageProtocol>();
     public static UserData currentPlayer;
     public static string clientUserName = "Default User";
     public static IPAddress ip = IPAddress.Parse("127.0.0.1");
@@ -116,7 +112,7 @@ public class NetworkProgram : MonoBehaviour
     public static bool isGoingToQuitGame=false;
 
     public static void ClientUpdateUserInfo(){
-        Message m=new Message("UpdateUser", MessagePackSerializer.Serialize(currentPlayer,lz4Options));
+        MessageProtocol m=new MessageProtocol(131, MessagePackSerializer.Serialize(currentPlayer,lz4Options));
         SendMessageToServer(m);
     }
     public static UnityEngine.Vector3 SysVec3ToUnityVec3(System.Numerics.Vector3 v){
@@ -124,7 +120,7 @@ public class NetworkProgram : MonoBehaviour
     }
     public static void InitNetwork(){
         Chunk.chunks=new Dictionary<Vector2Int,Chunk>();
-        toDoList=new Queue<Message>();
+        toDoList=new Queue<MessageProtocol>();
         clientSocket=new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             try{
             clientSocket.Connect(ip, port);
@@ -134,12 +130,13 @@ public class NetworkProgram : MonoBehaviour
              GameLauncher.returnToMenuTextContent="Failed Connecting:"+e.ToString();
                 return;
             }
-            currentPlayer = new UserData(UnityEngine.Random.Range(-1f,1f) * 10f+15f, 100f, UnityEngine.Random.Range(-1f,1f) * 10f+15f, UnityEngine.Random.Range(-1f,1f)  * 10f, clientUserName);
-            SendMessageToServer(new Message("Login", MessagePackSerializer.Serialize(currentPlayer,lz4Options)));
-         //   SendMessageToServer(new Message("ChunkGen", MessagePackSerializer.Serialize(new Vector2Int(0,0))));
-            isGoingToQuitGame=false;
-            Thread thread = new Thread(new ThreadStart(RecieveServer));
+             Thread thread = new Thread(new ThreadStart(RecieveServer));
             thread.Start();
+            currentPlayer = new UserData(UnityEngine.Random.Range(-1f,1f) * 10f+15f, 100f, UnityEngine.Random.Range(-1f,1f) * 10f+15f, UnityEngine.Random.Range(-1f,1f)  * 10f,UnityEngine.Random.Range(-1f,1f)  * 10f,UnityEngine.Random.Range(-1f,1f)  * 10f, clientUserName,false);
+            SendMessageToServer(new MessageProtocol(129, MessagePackSerializer.Serialize(currentPlayer,lz4Options)));
+         //   SendMessageToServer(new MessageProtocol(137, MessagePackSerializer.Serialize(new Vector2Int(0,0))));
+            isGoingToQuitGame=false;
+           
     }
     public static void ChangePlayerName(string s){
         clientUserName=s;
@@ -148,37 +145,40 @@ public class NetworkProgram : MonoBehaviour
         ip=IPAddress.Parse(s);
     }
     public static bool IsSocketAvaliable(Socket s){ return s!=null&&s.Connected==true;}
-    public static void ToDoListExecute(){
+    public static async void ToDoListExecute(){
         if(isGoingToQuitGame==true){
             return;
         }
         if(toDoList.Count>0){
-            Message m=toDoList.Peek();
+            
+            MessageProtocol m=toDoList.Peek();
             if(m==null){
                 Debug.Log("Empty message");
                    toDoList.Dequeue();
+                   return;
             }
-            switch (m.messageType)
+            switch (m.Command)
                         {
-                    case "ClientUpdateUser":
+                    case 141:
              //       Debug.Log("UserUpdate");
                         ClientUpdateUserInfo();
                         break;
-                    case "LoginReturn":
-                        UnityEngine.Debug.Log("Server:" + MessagePackSerializer.Deserialize<string>(m.messageContent));
-                        if(MessagePackSerializer.Deserialize<string>(m.messageContent,lz4Options)=="Failed"){
+                    case 136:
+                        UnityEngine.Debug.Log("Server:" + MessagePackSerializer.Deserialize<string>(m.MessageData));
+                        if(MessagePackSerializer.Deserialize<string>(m.MessageData,lz4Options)=="Failed"){
+                            isGoingToQuitGame=true;
                               GameLauncher.returnToMenuTextContent="Failed connecting: a player with the same name has joined the world.";
                         }
 
                         break;
-                    case "userCount":
-                        UnityEngine.Debug.Log("Server:" + m.messageContent);
-                        break;
-                    case "UnknownMessage":
-                        UnityEngine.Debug.Log("Server:"+ m.messageContent);
-                        break;
-                    case "WorldData":
-                    ChunkData cd= MessagePackSerializer.Deserialize<ChunkData>(m.messageContent,lz4Options);
+                //    case "userCount":
+              ////          UnityEngine.Debug.Log("Server:" + m.MessageData);
+              //          break;
+              //      case "UnknownMessage":
+              //          UnityEngine.Debug.Log("Server:"+ m.MessageData);
+              //          break;
+                    case 128:
+                    ChunkData cd= MessagePackSerializer.Deserialize<ChunkData>(m.MessageData,lz4Options);
                     if(!Chunk.chunks.ContainsKey(cd.chunkPos)){
                         break;
                     }else{
@@ -188,94 +188,109 @@ public class NetworkProgram : MonoBehaviour
                          Chunk.chunks[cd.chunkPos].isChunkDataDownloaded=true;
                         Chunk.chunks[cd.chunkPos].isWaitingForNewChunkData=false;
                     }
-                      
+
                             
                     break;
-                    case "ClientModifyChunk":
-                    BlockModifyData b = MessagePackSerializer.Deserialize<BlockModifyData>(m.messageContent,lz4Options);
+                    case 139:
+
+                    Task.Run(()=> {BlockModifyData b = MessagePackSerializer.Deserialize<BlockModifyData>(m.MessageData,lz4Options);
                     Vector2Int cPos = Chunk.Vec3ToChunkPos(new Vector3(b.x, b.y, b.z));
                     Vector3 chunkSpacePos = new Vector3(b.x, b.y, b.z) - new Vector3(cPos.x, 0, cPos.y);
                     if(Chunk.GetChunk(cPos) == null){
-                        break;
+                        return;
                     }else{
                    
                         Chunk.chunks[cPos].map[(int)chunkSpacePos.x,(int)chunkSpacePos.y,(int)chunkSpacePos.z]=b.convertType;
                         Chunk.chunks[cPos].isChunkUpdated=true;
                          Chunk.chunks[cPos].isChunkDataDownloaded=true;
                         Chunk.chunks[cPos].isWaitingForNewChunkData=false;
-                    }
+                    }});
                       
                             
                         break;
-                    case "EmitParticle":
+                    case 138:
                     Debug.Log("emit");
-                    ParticleData pd=MessagePackSerializer.Deserialize<ParticleData>(m.messageContent,lz4Options);
+                    ParticleData pd=MessagePackSerializer.Deserialize<ParticleData>(m.MessageData,lz4Options);
                     particleAndEffectBeh.SpawnParticle(new UnityEngine.Vector3(pd.posX,pd.posY,pd.posZ),pd.type);
                     break;
-                    case "ReturnAllUserData":
-               //     Debug.Log("datareturn");
-                        AllPlayersManager.clientPlayerList= MessagePackSerializer.Deserialize<List<UserData>>(m.messageContent,lz4Options);
-                        AllPlayersManager.isPlayerDataUpdated=true;
+                    case 135:
+                         Task.Run(()=> {AllPlayersManager.clientPlayerList= MessagePackSerializer.Deserialize<List<UserData>>(m.MessageData,lz4Options);
+                        AllPlayersManager.isPlayerDataUpdated=true;});
+                       
                         break;
                         default:
-                        UnityEngine.Debug.Log("Client: Unknown Message Type:"+m.messageType);
+                        UnityEngine.Debug.Log("Client: Unknown Message Type:"+m.MessageData);
                         break;
                         }
-                        toDoList.Dequeue();
+                      
+                       toDoList.Dequeue();     
+                        
+                        
         }
     }
     public static void RecieveServer()
     {
-        while (IsSocketAvaliable(clientSocket))
+        while (true)
         {
+          //   Debug.Log("1");
           //  Thread.Sleep(10);
             try
             {
-            byte[] data = new byte[10240000];
-           // clientSocket.Receive(data);
-                int count = clientSocket.Receive(data);
-                string str = System.Text.Encoding.UTF8.GetString(data, 0, count);
-                
-           
-                foreach(string s in str.Split('&'))
-                {
-                   
-                if (s.Length > 0) {
-                    Debug.Log(s.Length);
-                    if(s.Length>10240000){
-                    continue;
-                    }
-                        try{
-                             Message m=JsonConvert.DeserializeObject<Message>(s);
-                            toDoList.Enqueue(m);
-                        }catch{
-                                Debug.Log("Incomplete message");
-                        }
-                       
-                    
-                    }
-                }
-              
-            }
-            catch (Exception e)
+            MessageProtocol mp = null;
+            int ReceiveLength = 0;
+            byte[] staticReceiveBuffer = new byte[1024000];  // 接收缓冲区(固定长度)
+            byte[] dynamicReceiveBuffer = new byte[] { };  // 累加数据缓存(不定长)
+  
+ 
+            ReceiveLength = clientSocket.Receive(staticReceiveBuffer);  // 同步接收数据
+           //  Debug.Log(ReceiveLength);
+            dynamicReceiveBuffer = MessageProtocol.CombineBytes(dynamicReceiveBuffer, 0, dynamicReceiveBuffer.Length, staticReceiveBuffer, 0, ReceiveLength);  // 将之前多余的数据与接收的数据合并,形成一个完整的数据包
+            if (ReceiveLength <= 0)  // 如果接收到的数据长度小于0(通常表示socket已断开,但也不一定,需要进一步判断,此处可以忽略)
             {
+            Console.WriteLine("收到0字节数据");
+            break;  // 终止接收循环
+            }
+            else if (dynamicReceiveBuffer.Length < MessageProtocol.HEADLENGTH)  // 如果缓存中的数据长度小于协议头长度,则继续接收
+            {
+        
+            continue;  // 跳过本次循环继续接收数据
+                }
+            else  // 缓存中的数据大于等于协议头的长度(dynamicReadBuffer.Length >= 6)
+            {
+            var headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  // 解读协议头的信息
+             while (dynamicReceiveBuffer.Length - MessageProtocol.HEADLENGTH >= headInfo.DataLength)  // 当缓存数据长度减去协议头长度大于等于实际数据的长度则进入循环进行拆包处理
+                {
+           
+              mp = new MessageProtocol(dynamicReceiveBuffer);  // 拆包
+         //      Debug.Log(mp);
+              dynamicReceiveBuffer = mp.MoreData;  // 将拆包后得出多余的字节付给缓存变量,以待下一次循环处理数据时使用,若下一次循环缓存数据长度不能构成一个完整的数据包则不进入循环跳到外层循环继续接收数据并将本次得出的多余数据与之合并重新拆包,依次循环。
+              headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  // 从缓存中解读出下一次数据所需要的协议头信息,已准备下一次拆包循环,如果数据长度不能构成协议头所需的长度,拆包结果为0,下一次循环则不能成功进入,跳到外层循环继续接收数据合并缓存形成一个完整的数据包
+                toDoList.Enqueue(mp);
+
+
+            } // 拆包循环结束
+            }
+       
+        }
+            catch (Exception e)
+           {
                 UnityEngine.Debug.Log("Connection Lost: "+e);
                 
                  clientSocket.Close();
                  isGoingToQuitGame=true;
-                //  SceneManager.LoadScene(0);
-                AllPlayersManager.InitPlayerManager();
-             break;
-            }
+        //  //      //  SceneManager.LoadScene(0);
+            AllPlayersManager.InitPlayerManager();
+           break;
+           }
         
         }
       
     }
-    public static void SendMessageToServer(Message m)
+    public static void SendMessageToServer(MessageProtocol m)
     {
         try
         {
-            clientSocket.Send(System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(m)+'&'));
+            clientSocket.Send(m.GetBytes());
     //        clientSocket.Send(System.Text.Encoding.UTF8.GetBytes("&"));
         }
         catch(Exception e)
@@ -300,10 +315,6 @@ public class NetworkProgram : MonoBehaviour
         }
     }
 
-    
-       
-
-
     void Start()
     {
          InitNetwork();
@@ -319,7 +330,7 @@ public class NetworkProgram : MonoBehaviour
         ToDoListExecute();
     }
     void OnDestroy(){
-        SendMessageToServer(new Message("LogOut",MessagePackSerializer.Serialize("null",lz4Options)));
+        SendMessageToServer(new MessageProtocol(130,MessagePackSerializer.Serialize("null",lz4Options)));
         //clientSocket.Close();
     }
 }

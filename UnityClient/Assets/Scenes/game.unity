@@ -249,7 +249,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0.05
   far clip plane: 1000
   field of view: 90
   orthographic: 0
@@ -687,7 +687,6 @@ GameObject:
   - component: {fileID: 1759477120}
   - component: {fileID: 1759477119}
   - component: {fileID: 1759477118}
-  - component: {fileID: 1759477117}
   - component: {fileID: 1759477121}
   m_Layer: 0
   m_Name: gamemanager
@@ -696,29 +695,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1759477117
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1759477116}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cd2ec790ab673bc49b54fcb8b700a04d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  prePos: {x: 0, y: 0, z: 0}
-  nowPos: {x: 0, y: 0, z: 0}
-  isCurrentPlayer: 0
-  playerSpeed: 5
-  gravity: -9.8
-  jumpHeight: 5
-  playerY: 0
-  breakBlockCD: 0
-  cc: {fileID: 0}
-  cameraTrans: {fileID: 0}
-  cameraX: 0
 --- !u!114 &1759477118
 MonoBehaviour:
   m_ObjectHideFlags: 0

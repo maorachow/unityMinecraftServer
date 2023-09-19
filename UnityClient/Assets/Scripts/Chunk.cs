@@ -69,7 +69,7 @@ public class Chunk : MonoBehaviour
     void InvokeGetMap(){
         if(map==null&&chunks.ContainsKey(chunkPos)&&isChunkMessageSent==false){
             Debug.Log("null");
-            NetworkProgram.SendMessageToServer(new Message("ChunkGen",MessagePackSerializer.Serialize(chunkPos)));
+            NetworkProgram.SendMessageToServer(new MessageProtocol(137,MessagePackSerializer.Serialize(chunkPos)));
          //   BuildChunk();
             isChunkMessageSent=true;
         }
@@ -460,7 +460,7 @@ public class Chunk : MonoBehaviour
         isChunkBuilding=true;
   //  Debug.Log("BuildChunk");
     if(map==null){
-        NetworkProgram.SendMessageToServer(new Message("ChunkGen",MessagePackSerializer.Serialize(chunkPos)));
+        NetworkProgram.SendMessageToServer(new MessageProtocol(137,MessagePackSerializer.Serialize(chunkPos)));
         await Task.Delay(1000);
     }
     chunkMesh = new Mesh();
@@ -593,7 +593,7 @@ public class Chunk : MonoBehaviour
         BlockModifyData b = new BlockModifyData(x, y, z, type);
          Chunk chunkNeededUpdate=GetChunk(Vec3ToChunkPos(new Vector3(x,y,z)));
         chunkNeededUpdate.isWaitingForNewChunkData=true;
-        NetworkProgram.SendMessageToServer(new Message("UpdateChunk",MessagePackSerializer.Serialize(b)));
+        NetworkProgram.SendMessageToServer(new MessageProtocol(132,MessagePackSerializer.Serialize(b)));
 
        
         
