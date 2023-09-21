@@ -193,7 +193,8 @@ namespace MyMinecraftServer
         public int[,,] additiveMap = new int[chunkWidth + 2, chunkHeight + 2, chunkWidth + 2];
         [Key(1)]
         public Vector2Int chunkPos=new Vector2Int(0,0);
-
+        [IgnoreMember]
+        public bool isChunkDataSavedInDisk = false;
         public Chunk(Vector2Int chunkPos)
         {
             this.chunkPos = chunkPos;
@@ -225,6 +226,8 @@ namespace MyMinecraftServer
         public int updateCount = 0;
         public bool BFSIsWorking = false;
         public bool[,,] mapIsSearched;
+
+        public bool isModifiedInGame;
         public void BFSInit(int x, int y, int z, int ignoreSide, int GainedUpdateCount)
         {
             updateCount = GainedUpdateCount;
@@ -412,6 +415,33 @@ namespace MyMinecraftServer
             }
            
         }
+
+        public void SaveSingleChunk()
+        {
+
+            if (!isModifiedInGame)
+            {
+
+                return;
+            }
+            if (Program.chunkDataReadFromDisk.ContainsKey(chunkPos))
+            {
+                Program.chunkDataReadFromDisk.Remove(chunkPos);
+                int[,,] worldDataMap = map;
+                ChunkData wd = new ChunkData(chunkPos);
+                wd.map = worldDataMap;
+          
+                Program.chunkDataReadFromDisk.Add(chunkPos, wd);
+            }
+            else
+            {
+                int[,,] worldDataMap = map;
+                ChunkData wd = new ChunkData(chunkPos);
+                wd.map = worldDataMap;
+             
+                Program.chunkDataReadFromDisk.Add(chunkPos, wd);
+            }
+        }
         public static void SetBlockWithUpdate(Vector3 pos, int blockID)
         {
 
@@ -425,7 +455,13 @@ namespace MyMinecraftServer
         }
         public async Task InitMap(Vector2Int chunkPos)
         {
-            
+
+            if (Program.chunkDataReadFromDisk.ContainsKey(chunkPos))
+            {
+                isChunkDataSavedInDisk = true;
+                map = Program.chunkDataReadFromDisk[chunkPos].map;
+                return;
+            }
             map = additiveMap;
 
             frontChunk = Program.GetChunk(new Vector2Int(chunkPos.x, chunkPos.y + chunkWidth));

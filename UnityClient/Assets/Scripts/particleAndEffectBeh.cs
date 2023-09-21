@@ -34,6 +34,10 @@ void OnEnable(){
     ps=GetComponent<ParticleSystem>();
     psr=GetComponent<ParticleSystemRenderer>();
 }
+public void EmitSound(){
+     AudioSource.PlayClipAtPoint(Chunk.blockAudioDic[blockID],transform.position,1f);
+      Invoke("ReleaseGameObject",2f);
+}
 public void EmitParticle(){
     if(blockID==0){
         Invoke("ReleaseGameObject",2f);
@@ -127,10 +131,16 @@ public void EmitParticle(){
         }
     
     }
-    public static void SpawnParticle(Vector3 pos,int blockID){
+    public static void SpawnParticle(Vector3 pos,int blockID,bool isSoundOnly){
+     
            GameObject a=ObjectPools.particleEffectPool.Get();
             a.transform.position=new Vector3(Chunk.Vec3ToBlockPos(pos).x+0.5f,Chunk.Vec3ToBlockPos(pos).y+0.5f,Chunk.Vec3ToBlockPos(pos).z+0.5f);
             a.GetComponent<particleAndEffectBeh>().blockID=blockID;
-            a.GetComponent<particleAndEffectBeh>().SendMessage("EmitParticle");
+              if(isSoundOnly){
+            a.GetComponent<particleAndEffectBeh>().SendMessage("EmitSound");
+        }else{
+             a.GetComponent<particleAndEffectBeh>().SendMessage("EmitParticle");
+        }
+            
     }
 }

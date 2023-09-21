@@ -34,13 +34,16 @@ public class ParticleData
     public float posZ;
     [Key(3)]
     public int type;
+    [Key(4)]
+    public bool isSoundOnly = false;
 
-    public ParticleData(float posX, float posY, float posZ, int type)
+    public ParticleData(float posX, float posY, float posZ, int type, bool isSoundOnly)
     {
         this.posX = posX;
         this.posY = posY;
         this.posZ = posZ;
         this.type = type;
+        this.isSoundOnly = isSoundOnly;
     }
 }
 
@@ -100,6 +103,7 @@ public class UserData {
 
 public class NetworkProgram : MonoBehaviour
 { 
+    public static bool isGamePaused=false;
     public static object listLock=new object();
     public static MessagePackSerializerOptions lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
  //   public static Dictionary<Vector2Int,Chunk> chunks=new Dictionary<Vector2Int,Chunk>();
@@ -119,6 +123,7 @@ public class NetworkProgram : MonoBehaviour
         return new UnityEngine.Vector3(v.X,v.Y,v.Z);
     }
     public static void InitNetwork(){
+        isGamePaused=false;
         Chunk.chunks=new Dictionary<Vector2Int,Chunk>();
         toDoList=new Queue<MessageProtocol>();
         clientSocket=new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -136,7 +141,8 @@ public class NetworkProgram : MonoBehaviour
             SendMessageToServer(new MessageProtocol(129, MessagePackSerializer.Serialize(currentPlayer,lz4Options)));
          //   SendMessageToServer(new MessageProtocol(137, MessagePackSerializer.Serialize(new Vector2Int(0,0))));
             isGoingToQuitGame=false;
-           
+           PauseMenuUIBeh.instance.gameObject.SetActive(false);
+           Resume();
     }
     public static void ChangePlayerName(string s){
         clientUserName=s;
@@ -211,7 +217,7 @@ public class NetworkProgram : MonoBehaviour
                     case 138:
                     Debug.Log("emit");
                     ParticleData pd=MessagePackSerializer.Deserialize<ParticleData>(m.MessageData,lz4Options);
-                    particleAndEffectBeh.SpawnParticle(new UnityEngine.Vector3(pd.posX,pd.posY,pd.posZ),pd.type);
+                    particleAndEffectBeh.SpawnParticle(new UnityEngine.Vector3(pd.posX,pd.posY,pd.posZ),pd.type,pd.isSoundOnly);
                     break;
                     case 135:
                          Task.Run(()=> {AllPlayersManager.clientPlayerList= MessagePackSerializer.Deserialize<List<UserData>>(m.MessageData,lz4Options);
@@ -219,7 +225,7 @@ public class NetworkProgram : MonoBehaviour
                        
                         break;
                         default:
-                        UnityEngine.Debug.Log("Client: Unknown Message Type:"+m.MessageData);
+                        UnityEngine.Debug.Log("Client: Unknown Message Type:"+System.Text.Encoding.UTF8.GetString(m.MessageData));
                         break;
                         }
                       
@@ -233,7 +239,7 @@ public class NetworkProgram : MonoBehaviour
         while (true)
         {
           //   Debug.Log("1");
-          //  Thread.Sleep(10);
+            Thread.Sleep(3);
             try
             {
             MessageProtocol mp = null;
@@ -255,7 +261,7 @@ public class NetworkProgram : MonoBehaviour
         
             continue;  // 跳过本次循环继续接收数据
                 }
-            else  // 缓存中的数据大于等于协议头的长度(dynamicReadBuffer.Length >= 6)
+            else  // 缓存中的数据大于等于协议头的长度
             {
             var headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  // 解读协议头的信息
              while (dynamicReceiveBuffer.Length - MessageProtocol.HEADLENGTH >= headInfo.DataLength)  // 当缓存数据长度减去协议头长度大于等于实际数据的长度则进入循环进行拆包处理
@@ -315,6 +321,12 @@ public class NetworkProgram : MonoBehaviour
         }
     }
 
+    public static void QuitGame(){
+     //       UnityEngine.Debug.Log("Sending message failed "+e);
+       //     clientSocket.Close();
+            isGoingToQuitGame=true;
+        AllPlayersManager.InitPlayerManager();
+    }
     void Start()
     {
          InitNetwork();
@@ -328,6 +340,26 @@ public class NetworkProgram : MonoBehaviour
         }
 
         ToDoListExecute();
+        if(Input.GetKeyDown(KeyCode.Escape)){
+            PauseOrResume();
+        }
+    }
+    void PauseOrResume(){
+       if(isGamePaused==true){
+        Resume();
+       }else{
+        Pause();
+       }
+    }
+    public static void Pause(){
+        Time.timeScale=0;
+        PauseMenuUIBeh.instance.gameObject.SetActive(true);
+        isGamePaused=true;
+    }
+    public static void Resume(){
+        Time.timeScale=1;
+        PauseMenuUIBeh.instance.gameObject.SetActive(false);
+        isGamePaused=false;
     }
     void OnDestroy(){
         SendMessageToServer(new MessageProtocol(130,MessagePackSerializer.Serialize("null",lz4Options)));

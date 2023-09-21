@@ -24,9 +24,15 @@ public class ChunkData
     public int[,,] map;
     [Key(1)]
     public Vector2Int chunkPos = new Vector2Int(0, 0);
+    [JsonConstructor]
     public ChunkData(int[,,] map, Vector2Int chunkPos)
     {
         this.map = map;
+        this.chunkPos = chunkPos;
+    }
+    public ChunkData(Vector2Int chunkPos)
+    {
+      //  this.map = map;
         this.chunkPos = chunkPos;
     }
 }
@@ -61,13 +67,16 @@ public class ParticleData
     public float posZ;
     [Key(3)]
     public int type;
+    [Key(4)]
+    public bool isSoundOnly = false;
 
-    public ParticleData(float posX, float posY, float posZ, int type)
+    public ParticleData(float posX, float posY, float posZ, int type, bool isSoundOnly)
     {
         this.posX = posX;
         this.posY = posY;
         this.posZ = posZ;
         this.type = type;
+        this.isSoundOnly = isSoundOnly;
     }
 }
 
@@ -117,31 +126,106 @@ public class UserData {
 }*/
 public class Program
 {
+    static Form1 mainForm;
     static MessagePackSerializerOptions lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
     static object allClientSocketsOnlineLock = new object();
-    static Chunk world;
-    static Dictionary<Vector2Int,Chunk> chunks= new Dictionary<Vector2Int,Chunk>();
-    static object listLock = new object();
+    //  static Chunk world;
+    public static string gameWorldDataPath= AppDomain.CurrentDomain.BaseDirectory;
+    public static Dictionary<Vector2Int,Chunk> chunks= new Dictionary<Vector2Int,Chunk>();
+    public static Dictionary<Vector2Int, ChunkData> chunkDataReadFromDisk = new Dictionary<Vector2Int, ChunkData>();
+    public static object listLock = new object();
     public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int> toDoList2 = new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>();//双线程处理消息
     public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>,int> toDoList=new PriorityQueue<KeyValuePair<Socket, MessageProtocol>,int>();
-    static IPAddress ip = IPAddress.Parse("0.0.0.0");
-    static int port = 11111;
-    static Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-    static List<Socket> allClientSocketsOnline=new List<Socket>();
-    static List<UserData> allUserData=new List<UserData>();
+    public static IPAddress ip = IPAddress.Parse("0.0.0.0");
+    public static int port = 11111;
+    public static Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    public static List<Socket> allClientSocketsOnline=new List<Socket>();
+    public static List<UserData> allUserData=new List<UserData>();
     static object listLock2 = new object();
     static object chunkLock = new object();
     static object userDataLock = new object();
+
+    public static bool isJsonReadFromDisk { get; private set; }
+    public static bool isWorldDataSaved { get; private set; }
+
     public static void UserLogout(Socket socket) {
         int index = allClientSocketsOnline.FindIndex(delegate (Socket cl) { return cl == socket; });
         if (index!=-1)
         {
             allClientSocketsOnline.RemoveAt(index);
             allUserData.RemoveAt(index);
-            Console.WriteLine(socket.RemoteEndPoint.ToString() + "  logged out");
+            mainForm.LogOnTextbox(socket.RemoteEndPoint.ToString() + "  logged out");
             CastToAllClients(new MessageProtocol(135, MessagePackSerializer.Serialize(allUserData)));
             socket.Close();
         }
+    }
+    public static void SaveWorldData()
+    {
+
+        FileStream fs;
+        if (File.Exists(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json"))
+        {
+            fs = new FileStream(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json", FileMode.Truncate, FileAccess.Write);//Truncate模式打开文件可以清空。
+        }
+        else
+        {
+            fs = new FileStream(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json", FileMode.Create, FileAccess.Write);
+        }
+        fs.Close();
+        foreach (KeyValuePair<Vector2Int, Chunk> c in chunks)
+        {
+            // int[] worldDataMap=ThreeDMapToWorldData(c.Value.map);
+            //   int x=(int)c.Value.transform.position.x;
+            //  int z=(int)c.Value.transform.position.z;
+            //   WorldData wd=new WorldData();
+            //   wd.map=worldDataMap;
+            //   wd.posX=x;
+            //   wd.posZ=z;
+            //   string tmpData=JsonMapper.ToJson(wd);
+            //   File.AppendAllText(Application.dataPath+"/GameData/world.json",tmpData+"\n");
+            c.Value.SaveSingleChunk();
+        }
+     
+        foreach (KeyValuePair<Vector2Int, ChunkData> wd in chunkDataReadFromDisk)
+        {
+            string tmpData = JsonConvert.SerializeObject(wd.Value);
+            File.AppendAllText(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json", tmpData + "\n");
+        }
+        isWorldDataSaved = true;
+    }
+    public static void ReadJson()
+    {
+        chunkDataReadFromDisk.Clear();
+     //   gameWorldDataPath = WorldManager.gameWorldDataPath;
+
+        if (!Directory.Exists(gameWorldDataPath + "unityMinecraftServerData"))
+        {
+            Directory.CreateDirectory(gameWorldDataPath + "unityMinecraftServerData");
+
+        }
+        if (!Directory.Exists(gameWorldDataPath + "unityMinecraftServerData/GameData"))
+        {
+            Directory.CreateDirectory(gameWorldDataPath + "unityMinecraftServerData/GameData");
+        }
+
+        if (!File.Exists(gameWorldDataPath + "unityMinecraftServerData" + "/GameData/world.json"))
+        {
+           FileStream fs= File.Create(gameWorldDataPath + "unityMinecraftServerData" + "/GameData/world.json");
+            fs.Close();
+        }
+
+        string[] worldData = File.ReadAllLines(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json");
+        List<ChunkData> tmpList = new List<ChunkData>();
+        foreach (string s in worldData)
+        {
+            ChunkData tmp = JsonConvert.DeserializeObject<ChunkData>(s);
+            tmpList.Add(tmp);
+        }
+        foreach (ChunkData w in tmpList)
+        {
+            chunkDataReadFromDisk.Add(new Vector2Int(w.chunkPos.x, w.chunkPos.y), w);
+        }
+        isJsonReadFromDisk = true;
     }
     public static void socketWait(Socket socket)
     {
@@ -153,8 +237,8 @@ public class Program
      //   allClientSockets.Add(s);
         Thread t=new Thread(new ParameterizedThreadStart(RecieveClient));
         t.Start(s);
-        Console.WriteLine("connected");
-        Console.WriteLine(socket.ToString());
+        mainForm.LogOnTextbox("connected");
+        mainForm.LogOnTextbox(socket.ToString());
         }
        
       
@@ -181,7 +265,7 @@ public class Program
         tmp.X = MathF.Floor(tmp.X / (float)Chunk.chunkWidth) * Chunk.chunkWidth;
         tmp.Z = MathF.Floor(tmp.Z / (float)Chunk.chunkWidth) * Chunk.chunkWidth;
         Vector2Int value = new Vector2Int((int)tmp.X, (int)tmp.Z);
-      //  Console.WriteLine(value.x+" "+value.y+"\n");
+      //  mainForm.LogOnTextbox(value.x+" "+value.y+"\n");
         return value;
     }
     public static Chunk GetChunk(Vector2Int chunkPos)
@@ -208,7 +292,7 @@ public class Program
             {//public int Receive (System.Collections.Generic.IList<ArraySegment<byte>> buffers);
                 if (s == null||s.Connected==false)
                 {
-                    Console.WriteLine("Recieve client failed:socket closed");
+                    mainForm.LogOnTextbox("Recieve client failed:socket closed");
                     return;
                 }
            //     int count =s.Receive(bb);
@@ -222,7 +306,7 @@ public class Program
                     dynamicReceiveBuffer = MessageProtocol.CombineBytes(dynamicReceiveBuffer, 0, dynamicReceiveBuffer.Length, staticReceiveBuffer, 0, ReceiveLength);  // 将之前多余的数据与接收的数据合并,形成一个完整的数据包
                     if (ReceiveLength <= 0)  // 如果接收到的数据长度小于0(通常表示socket已断开,但也不一定,需要进一步判断,此处可以忽略)
                     {
-                        Console.WriteLine("收到0字节数据");
+                        mainForm.LogOnTextbox("收到0字节数据");
                         UserLogout(s);
                         return;  // 终止接收循环
                     }
@@ -236,7 +320,7 @@ public class Program
                         while (dynamicReceiveBuffer.Length - MessageProtocol.HEADLENGTH >= headInfo.DataLength)  // 当缓存数据长度减去协议头长度大于等于实际数据的长度则进入循环进行拆包处理
                         {
                             mp = new MessageProtocol(dynamicReceiveBuffer);  // 拆包
-                     //       Console.WriteLine("Message:"+mp.Command);
+                     //       mainForm.LogOnTextbox("Message:"+mp.Command);
                             dynamicReceiveBuffer = mp.MoreData;  // 将拆包后得出多余的字节付给缓存变量,以待下一次循环处理数据时使用,若下一次循环缓存数据长度不能构成一个完整的数据包则不进入循环跳到外层循环继续接收数据并将本次得出的多余数据与之合并重新拆包,依次循环。
                             headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  // 从缓存中解读出下一次数据所需要的协议头信息,已准备下一次拆包循环,如果数据长度不能构成协议头所需的长度,拆包结果为0,下一次循环则不能成功进入,跳到外层循环继续接收数据合并缓存形成一个完整的数据包
                             if (toDoList.Count > toDoList2.Count)
@@ -298,7 +382,7 @@ public class Program
                  {
                        if (x.Length > 0)
                          {
-                         //         Console.WriteLine(x);
+                         //         mainForm.LogOnTextbox(x);
                          if (toDoList.Count > toDoList2.Count){
                              lock (listLock2)
                              {
@@ -355,13 +439,13 @@ public class Program
                      }
                          }
 
-                 //  Console.WriteLine("Recieved Message:" + JsonConvert.DeserializeObject<Message>(str));
+                 //  mainForm.LogOnTextbox("Recieved Message:" + JsonConvert.DeserializeObject<Message>(str));
 
              }
                      }*/
 
             }
-        catch (Exception ex) { Console.WriteLine("Connection stopped : "+ex.ToString());UserLogout(s);
+        catch (Exception ex) { mainForm.LogOnTextbox("Connection stopped : "+ex.ToString());UserLogout(s);
                 break; }
         }
       
@@ -376,7 +460,7 @@ public class Program
         }
         catch(Exception ex) 
         {
-            Console.WriteLine("Message sending failed: "+ex);
+            mainForm.LogOnTextbox("Message sending failed: "+ex);
         }
         
     }
@@ -386,7 +470,7 @@ public class Program
         while (true)
         {
             Thread.Sleep(100);
-            //  Console.WriteLine("Update");
+            //  mainForm.LogOnTextbox("Update");
             if (toDoList.Count < toDoList2.Count)
             {
             lock(listLock)
@@ -423,7 +507,7 @@ public class Program
         }
         else
         {
-            Console.WriteLine(s.ToString()+"Logged in");
+            mainForm.LogOnTextbox(s.ToString()+"Logged in");
             SendToClient(s, new MessageProtocol(136, MessagePackSerializer.Serialize("Success")));
             allClientSocketsOnline.Add(s);
             allUserData.Add(u);
@@ -463,50 +547,52 @@ public class Program
         }
        
     }
-    static void ServerConsoleControl()
+   /* static void ServerConsoleControl()
     {
-        Console.WriteLine("Press 1 to list players,press 2 to list chunks,press 3 to get current message count");
+        mainForm.LogOnTextbox("Press 1 to list players,press 2 to list chunks,press 3 to get current message count,press 4 to stop server");
         while(true)
         {
 
             switch (Console.ReadKey().KeyChar)
         {
                 case '1':
-            Console.WriteLine("\n");
+            mainForm.LogOnTextbox("\n");
                     try
                     {
                 foreach(UserData u in allUserData)
             {
-                Console.WriteLine(JsonConvert.SerializeObject(u));
+                mainForm.LogOnTextbox(JsonConvert.SerializeObject(u));
             }
                     }
                     catch
                     {
-                        Console.WriteLine("User list is was modified");
+                        mainForm.LogOnTextbox("User list is was modified");
                     }
            
                     break;
                 case '2':
                     foreach(KeyValuePair<Vector2Int,Chunk> c in chunks)
                     {
-                        Console.WriteLine(JsonConvert.SerializeObject(c.Key));
+                        mainForm.LogOnTextbox(JsonConvert.SerializeObject(c.Key));
                     }
                         
                     
                     break;
                 case '3':
-                    Console.WriteLine("\nMessage Count:"+toDoList.Count.ToString());
-                    Console.WriteLine("\nMessage Count:" + toDoList2.Count.ToString());
+                    mainForm.LogOnTextbox("\nMessage Count:"+toDoList.Count.ToString());
+                    mainForm.LogOnTextbox("\nMessage Count:" + toDoList2.Count.ToString());
                     break;
-                        
-           
-        }
+                case '4':
+                    StopServer();
+                    break;
+
+            }
         }
       
 
                 
     }
-
+   */
 
     static async void ExecuteToDoList(PriorityQueue<KeyValuePair<Socket,MessageProtocol>,int> listToExecute,object objLock)
     {
@@ -526,7 +612,7 @@ public class Program
                     message = listToExecute.Peek().Value;
                     if (message == null)
                     {
-                        Console.WriteLine("Empty Message");
+                        mainForm.LogOnTextbox("Empty Message");
                         listToExecute.Dequeue();
                         continue;
                     }
@@ -564,7 +650,7 @@ public class Program
                         break;
                         //message content type:blockmodifydata
                         case 133:
-                            Console.WriteLine("updateinternal");
+                            mainForm.LogOnTextbox("updateinternal");
                             BlockModifyData binternal = MessagePackSerializer.Deserialize<BlockModifyData>(message.MessageData);
                             if (GetChunk(Vec3ToChunkPos(new Vector3(binternal.x, binternal.y, binternal.z))) == null)
                             {
@@ -577,20 +663,20 @@ public class Program
                                 ParticleData pd;
                                 if (binternal.convertType == 0)
                                 {
-                                    pd = new ParticleData((binternal.x)+0.5f,(binternal.y) + 0.5f, (binternal.z) + 0.5f, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z]);
-                                    Console.WriteLine("Emit");
+                                    pd = new ParticleData((binternal.x)+0.5f,(binternal.y) + 0.5f, (binternal.z) + 0.5f, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z],false);
+                                    mainForm.LogOnTextbox("Emit");
                                 }
                                 else
                                 {
-                                    pd = null;
+                                    pd = new ParticleData(binternal.x, binternal.y, binternal.z, binternal.convertType, true);
                                 }
                                 GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z] = binternal.convertType;
-                           
-                                if (binternal.convertType == 0 && pd != null)
-                                {
+                                GetChunk(x).isModifiedInGame = true;
+                                    //     if (binternal.convertType == 0 && pd != null)
+                                    //   {
                                     CastToAllClients(new MessageProtocol(138, MessagePackSerializer.Serialize(pd)));
 
-                                }
+                              //  }
                                 CastToAllClients(new MessageProtocol(139, MessagePackSerializer.Serialize(binternal)));
 
                             }
@@ -614,20 +700,21 @@ public class Program
                                 ParticleData pd;
                                 if (b.convertType == 0)
                                 {
-                                     pd = new ParticleData(b.x,b.y,b.z, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z]);
-                                    Console.WriteLine("Emit");
+                                     pd = new ParticleData(b.x,b.y,b.z, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z], false);
+                                    mainForm.LogOnTextbox("Emit");
                                 }
                                 else
                                 {
-                                    pd = null;
+                                    pd = new ParticleData(b.x, b.y, b.z,b.convertType, true);
+                                    //pd = null;
                                 }
                                 GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z] = b.convertType;
-                               
-                                if (b.convertType == 0 && pd != null)
-                                {
-                                    CastToAllClients(new MessageProtocol(138, MessagePackSerializer.Serialize(pd)));
+                                GetChunk(x).isModifiedInGame = true;
+                                //     if (b.convertType == 0 && pd != null)
+                                //      {
+                                CastToAllClients(new MessageProtocol(138, MessagePackSerializer.Serialize(pd)));
                                     
-                                }
+                          //      }
                                 CastToAllClients(new MessageProtocol(139, MessagePackSerializer.Serialize(b)));
                                 GetChunk(x).BFSInit((int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z, 7,0);
                         }
@@ -693,7 +780,7 @@ public class Program
                     message = toDoList2.Peek().Value;
                     if (message == null)
                     {
-                        Console.WriteLine("Empty Message");
+                        mainForm.LogOnTextbox("Empty Message");
                         toDoList2.Dequeue();
                         continue;
                     }
@@ -788,20 +875,66 @@ public class Program
 
         }
     }*/
-    static void Main(string[] args)
+   public static void StopServer()
     {
+        lock (allClientSocketsOnlineLock)
+        {
+        for(int i=0;i<allClientSocketsOnline.Count;i++)
+        {
+                UserLogout(allClientSocketsOnline[i]);
+        }
+        }
+       
+        SaveWorldData();
+        Environment.Exit(0);
+    }
+    public static void LoadApp()
+    {
+        mainForm.LogOnTextbox("Reading World Data...");
+        Task t = new Task(() => ReadJson());
+        t.RunSynchronously();
+        serverSocket.Bind(new IPEndPoint(ip, port));
+        Thread waiterThread = new Thread(() => socketWait(serverSocket));
+        waiterThread.Start();
+        Thread updateThread = new Thread(() => UpdateData());
+        updateThread.Start();
+
+        Thread executeThread = new Thread(() => ExecuteToDoList(toDoList, listLock));
+        executeThread.Start();
+        Thread executeThread2 = new Thread(() => ExecuteToDoList(toDoList2, listLock2));
+        executeThread2.Start();
+        mainForm.LogOnTextbox("Server Started! IP:"+ip.ToString()+":"+port.ToString());
+      //  Thread ServerConsoleControlThread = new Thread(() => ServerConsoleControl());
+     //   ServerConsoleControlThread.Start();
+    }
+    static void Main(string[] args)
+    {   Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        mainForm = new Form1();
+        Application.Run(mainForm);
+        
+    /*    Task t= new Task(()=> ReadJson());
+        t.RunSynchronously();
         serverSocket.Bind(new IPEndPoint(ip, port));
         Thread waiterThread = new Thread(()=>socketWait(serverSocket));
         waiterThread.Start();
         Thread updateThread = new Thread(() => UpdateData());
         updateThread.Start();
-        Thread ServerConsoleControlThread = new Thread(() => ServerConsoleControl());
-        ServerConsoleControlThread.Start();
+      
+        
 
         Thread executeThread = new Thread(() => ExecuteToDoList(toDoList,listLock));
         executeThread.Start();
         Thread executeThread2 = new Thread(() => ExecuteToDoList(toDoList2, listLock2));
         executeThread2.Start();
+        mainForm.LogOnTextbox("Server Started!");*/
+       // Thread ServerConsoleControlThread = new Thread(() => ServerConsoleControl());
+      //  ServerConsoleControlThread.Start();
+        
+        //2.开启窗口的消息循环，初始化并启动Form1窗口
+       
+
+
         //   Thread executeThread2 = new Thread(() => ExecuteToDoList());
         //    executeThread2.Start();
         //  return;

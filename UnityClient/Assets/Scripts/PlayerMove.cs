@@ -9,9 +9,13 @@ using System.Threading.Tasks;
 using MessagePack;
 public class PlayerMove : MonoBehaviour
 {
+    public Bounds playerBoundingBox;
+    public static GameObject blockOutlinePrefab;
+    public GameObject blockOutlineInBlock;
+    public GameObject blockOutlineColliding;
     public static GameObject chunkPrefab;
     public static int viewRange=32;
-    public static float mouseSens=5f;
+    public static float mouseSens=10f;
     public Vector3 prePos;
     public Vector3 nowPos;
     public bool isCurrentPlayer=false;
@@ -32,10 +36,20 @@ public class PlayerMove : MonoBehaviour
     public Vector2 lastpos;
     public List<Vector2> speedTempPosList;
     public float playerAnimSpeed;
+    public Camera mainCam;
     public Animator am;
     void Start(){
+        playerBoundingBox=new Bounds(transform.position,new Vector3(0.8f,1.8f,0.8f));
+        if(blockOutlinePrefab==null){
+       blockOutlinePrefab=Resources.Load<GameObject>("Prefabs/blockoutline");       
+        }
+        blockOutlineInBlock=Instantiate(blockOutlinePrefab,transform.position,Quaternion.identity);
+        blockOutlineColliding=Instantiate(blockOutlinePrefab,transform.position,Quaternion.identity);
         prePos=transform.position;
-        chunkPrefab=Resources.Load<GameObject>("Prefabs/chunk");
+        if(chunkPrefab==null){
+          chunkPrefab=Resources.Load<GameObject>("Prefabs/chunk");  
+        }
+        mainCam=Camera.main;
          cc=GetComponent<CharacterController>();
          cameraTrans=GameObject.Find("Main Camera").GetComponent<Transform>();   
          bodyTrans=transform.GetChild(0).GetChild(1);
@@ -70,6 +84,9 @@ public class PlayerMove : MonoBehaviour
      
     }
     public float GetSpeed(){
+        if(NetworkProgram.isGamePaused==true){
+            return speedTempPosList[0].magnitude/(1f/144f);
+        }
         speedTempPosList .Add(new Vector2(transform.position.x,transform.position.z));//当前点
      //   List<float> tmp=new List<float>();
         float tmpspeed=0f;
@@ -94,28 +111,58 @@ public class PlayerMove : MonoBehaviour
     }
     void Update()
     {
-       
-        if(!isCurrentPlayer){
-        playerAnimSpeed=Mathf.Lerp(playerAnimSpeed,GetSpeed(),5f*Time.deltaTime);
+        if(NetworkProgram.isGamePaused==true){
+            am.Play("playerwalk",0,0f);
+            return;
+        }
+        playerAnimSpeed=GetSpeed();
         am.SetFloat("speed",playerAnimSpeed);
         am.SetBool("isattacking",isPlayerAttacking);
+        
+       playerBoundingBox.center=transform.position;
+       
+        
+        if(!isCurrentPlayer){
+        blockOutlineInBlock.GetComponent<MeshRenderer>().enabled=false;
+            blockOutlineColliding.GetComponent<MeshRenderer>().enabled=false;
      //       nowPos=transform.position;
        //     transform.position=Vector3.Lerp(prePos,nowPos,20f*Time.deltaTime);
         //    prePos=transform.position;
              playerMoveRef.eulerAngles=new Vector3(0f,playerMoveRef.eulerAngles.y,0f);
-            bodyTrans.rotation=Quaternion.Lerp(bodyTrans.rotation,playerMoveRef.rotation,5f*Time.deltaTime);
-
+            bodyTrans.rotation=Quaternion.Lerp(bodyTrans.rotation,Quaternion.Euler(0f,headTrans.eulerAngles.y,0f),5f*Time.deltaTime);
+            am.SetFloat("speed",playerAnimSpeed);
+            am.SetBool("isattacking",isPlayerAttacking);
             return;
-        }else{
-        playerAnimSpeed=Mathf.Lerp(playerAnimSpeed,GetSpeed(),5f*Time.deltaTime);
-        am.SetFloat("speed",playerAnimSpeed);
-        am.SetBool("isattacking",isPlayerAttacking);
         }
+         
+            am.SetFloat("speed",playerAnimSpeed);
+            am.SetBool("isattacking",isPlayerAttacking);
+      
 
-
-        cameraTrans.SetParent(headTrans);
-        cameraTrans.localPosition=new Vector3(0f,0.3f,-0.1f);
+       
+        Ray ray=mainCam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        RaycastHit info;
+         if(Physics.Raycast(ray,out info,10f)){
+            Vector3 hitBlockPoint=info.point+cameraTrans.forward*0.01f;
+            Vector3 placeBlockPoint=info.point-cameraTrans.forward*0.01f;
+            blockOutlineInBlock.GetComponent<MeshRenderer>().enabled=true;
+            blockOutlineColliding.GetComponent<MeshRenderer>().enabled=false;
+             blockOutlineInBlock.transform.position=new Vector3(Chunk.Vec3ToBlockPos(hitBlockPoint).x+0.5f,Chunk.Vec3ToBlockPos(hitBlockPoint).y+0.5f,Chunk.Vec3ToBlockPos(hitBlockPoint).z+0.5f);
+            blockOutlineColliding.transform.position=new Vector3(Chunk.Vec3ToBlockPos(placeBlockPoint).x+0.5f,Chunk.Vec3ToBlockPos(placeBlockPoint).y+0.5f,Chunk.Vec3ToBlockPos(placeBlockPoint).z+0.5f);
+        }else{
+             blockOutlineInBlock.transform.position=transform.position;
+            blockOutlineColliding.transform.position=transform.position;
+              blockOutlineInBlock.GetComponent<MeshRenderer>().enabled=false;
+            blockOutlineColliding.GetComponent<MeshRenderer>().enabled=false;
+        }
+        if(cameraTrans.parent==null){
+         cameraTrans.SetParent(headTrans);   
+        cameraTrans.localPosition=new Vector3(0f,0.3f,-0.1f); 
         cameraTrans.localEulerAngles=new Vector3(0f,0f,0f);
+        }
+        
+        
+        
         NetworkProgram.currentPlayer.posX=transform.position.x;
         NetworkProgram.currentPlayer.posY=transform.position.y;
         NetworkProgram.currentPlayer.posZ=transform.position.z;
@@ -125,10 +172,13 @@ public class PlayerMove : MonoBehaviour
         NetworkProgram.currentPlayer.isAttacking=isPlayerAttacking;    
         float x = Input.GetAxis("Mouse X")*mouseSens;
         float y = Input.GetAxis("Mouse Y")*mouseSens;
+        y=Mathf.Clamp(y,-90f,90f);
         cameraX-=y;
        // float cameraX=cameraTrans.localEulerAngles.x+y;
         cameraX=Mathf.Clamp(cameraX,-90f,90f);
-        headTrans.eulerAngles=new Vector3(cameraX,headTrans.eulerAngles.y+x,0f);
+        
+        headTrans.rotation=Quaternion.Euler(new Vector3(cameraX,headTrans.eulerAngles.y,0f));
+        headTrans.eulerAngles+=new Vector3(0f,x,0f);
         playerMoveRef.eulerAngles=new Vector3(0f,playerMoveRef.eulerAngles.y,0f);
         bodyTrans.rotation=Quaternion.Lerp(bodyTrans.rotation,playerMoveRef.rotation,5f*Time.deltaTime);
            if(Chunk.GetChunk(Chunk.Vec3ToChunkPos(transform.position))==null||Chunk.GetChunk(Chunk.Vec3ToChunkPos(transform.position)).isChunkDataDownloaded==false){
@@ -154,6 +204,10 @@ public class PlayerMove : MonoBehaviour
             breakBlockCD=0.3f;
             BreakBlock();
         }
+         if(Input.GetMouseButton(1)&&breakBlockCD<=0f){
+            breakBlockCD=0.3f;
+            PlaceBlock();
+        }
 
     }
     void FixedUpdate(){
@@ -166,13 +220,28 @@ public class PlayerMove : MonoBehaviour
         isPlayerAttacking=false;
     }
      void BreakBlock(){
-        Ray ray=Camera.main.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        Ray ray=mainCam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
         RaycastHit info;
         if(Physics.Raycast(ray,out info,10f)){
             Vector3 hitBlockPoint=info.point+cameraTrans.forward*0.01f;
             isPlayerAttacking=true;
             Invoke("InvokeStopAttack",0.3f);
             StartCoroutine(Chunk.SetBlock(hitBlockPoint.x,hitBlockPoint.y,hitBlockPoint.z,0));
+
+        }
+    }
+     void PlaceBlock(){
+        Ray ray=mainCam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        RaycastHit info;
+        if(Physics.Raycast(ray,out info,10f)){
+            Vector3 hitBlockPoint=info.point-cameraTrans.forward*0.01f;
+            blockOutlineColliding.GetComponent<BlockOutlineBeh>().CheckIsCollidingWithPlayer();
+            if(blockOutlineColliding.GetComponent<BlockOutlineBeh>().isCollidingWithPlayer!=true){
+            isPlayerAttacking=true;
+            Invoke("InvokeStopAttack",0.3f);
+            StartCoroutine(Chunk.SetBlock(hitBlockPoint.x,hitBlockPoint.y,hitBlockPoint.z,1));
+            }
+         
 
         }
     }

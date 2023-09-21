@@ -460,8 +460,9 @@ public class Chunk : MonoBehaviour
         isChunkBuilding=true;
   //  Debug.Log("BuildChunk");
     if(map==null){
+        Debug.Log("Send");
         NetworkProgram.SendMessageToServer(new MessageProtocol(137,MessagePackSerializer.Serialize(chunkPos)));
-        await Task.Delay(1000);
+       // await Task.Delay(1000);
     }
     chunkMesh = new Mesh();
     chunkNonSolidMesh=new Mesh();
@@ -601,15 +602,23 @@ public class Chunk : MonoBehaviour
   //      Debug.Log("finished");
           if(chunkNeededUpdate.frontChunk!=null){
            chunkNeededUpdate.frontChunk.isChunkUpdated=true;
+            }else{
+                
             }
             if(chunkNeededUpdate.backChunk!=null){
             chunkNeededUpdate.backChunk.isChunkUpdated=true;
+            }else{
+                
             }
             if(chunkNeededUpdate.leftChunk!=null){
             chunkNeededUpdate.leftChunk.isChunkUpdated=true;
+            }else{
+                
             }
             if(chunkNeededUpdate.rightChunk!=null){
             chunkNeededUpdate.rightChunk.isChunkUpdated=true;
+            }else{
+                
             }
             yield break;
     }
