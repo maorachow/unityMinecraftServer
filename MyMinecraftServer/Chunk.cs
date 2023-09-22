@@ -244,7 +244,7 @@ namespace MyMinecraftServer
             {
                 return;
             }
-            if (updateCount > 32)
+            if (updateCount > 64)
             {
 
          //       Program.CastToAllClients(new Message("WorldData", MessagePackSerializer.Serialize(this.ChunkToChunkData())));
@@ -451,7 +451,7 @@ namespace MyMinecraftServer
             Vector3Int chunkSpacePos = intPos - new Vector3Int(chunkNeededUpdate.chunkPos.x,0,chunkNeededUpdate.chunkPos.y);
           //  chunkNeededUpdate.map[chunkSpacePos.x, chunkSpacePos.y, chunkSpacePos.z] = blockID;
             BlockModifyData b = new BlockModifyData(pos.X, pos.Y, pos.Z , blockID);
-            Program.toDoList.Enqueue(new KeyValuePair<Socket, MessageProtocol>(null, new MessageProtocol(133, MessagePackSerializer.Serialize(b))), 0);
+            Program.AppendMessage(null, new MessageProtocol(133, MessagePackSerializer.Serialize(b)));
         }
         public async Task InitMap(Vector2Int chunkPos)
         {

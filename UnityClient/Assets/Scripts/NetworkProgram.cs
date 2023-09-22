@@ -225,7 +225,8 @@ public class NetworkProgram : MonoBehaviour
                        
                         break;
                         default:
-                        UnityEngine.Debug.Log("Client: Unknown Message Type:"+System.Text.Encoding.UTF8.GetString(m.MessageData));
+
+                        UnityEngine.Debug.Log("Client: Unknown Message Type:"+m.Command+" "+m.DataLength+System.Text.Encoding.UTF8.GetString(m.MessageData));
                         break;
                         }
                       
@@ -236,17 +237,18 @@ public class NetworkProgram : MonoBehaviour
     }
     public static void RecieveServer()
     {
+            MessageProtocol mp = null;
+            int ReceiveLength = 0;
+            byte[] staticReceiveBuffer = new byte[1024000];  // 接收缓冲区(固定长度)
+            byte[] dynamicReceiveBuffer = new byte[] { };  // 累加数据缓存(不定长)
         while (true)
         {
           //   Debug.Log("1");
             Thread.Sleep(3);
             try
             {
-            MessageProtocol mp = null;
-            int ReceiveLength = 0;
-            byte[] staticReceiveBuffer = new byte[1024000];  // 接收缓冲区(固定长度)
-            byte[] dynamicReceiveBuffer = new byte[] { };  // 累加数据缓存(不定长)
-  
+        
+                    
  
             ReceiveLength = clientSocket.Receive(staticReceiveBuffer);  // 同步接收数据
            //  Debug.Log(ReceiveLength);
@@ -263,7 +265,9 @@ public class NetworkProgram : MonoBehaviour
                 }
             else  // 缓存中的数据大于等于协议头的长度
             {
-            var headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  // 解读协议头的信息
+            var headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  
+            Debug.Log(headInfo.DataLength);
+            // 解读协议头的信息
              while (dynamicReceiveBuffer.Length - MessageProtocol.HEADLENGTH >= headInfo.DataLength)  // 当缓存数据长度减去协议头长度大于等于实际数据的长度则进入循环进行拆包处理
                 {
            

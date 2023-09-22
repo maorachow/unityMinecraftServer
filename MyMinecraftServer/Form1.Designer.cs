@@ -43,7 +43,7 @@
             textBox1.Name = "textBox1";
             textBox1.ReadOnly = true;
             textBox1.ScrollBars = ScrollBars.Vertical;
-            textBox1.Size = new Size(800, 235);
+            textBox1.Size = new Size(857, 235);
             textBox1.TabIndex = 0;
             textBox1.TextChanged += textBox1_TextChanged;
             // 
@@ -95,7 +95,7 @@
             // 
             AutoScaleDimensions = new SizeF(9F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
+            ClientSize = new Size(857, 450);
             Controls.Add(label1);
             Controls.Add(button3);
             Controls.Add(button2);
@@ -105,6 +105,7 @@
             Text = "MyMinecraftServer";
             FormClosing += Form1_FormClosing;
             Load += Form1_Load;
+            Resize += Form1_Resize;
             ResumeLayout(false);
             PerformLayout();
         }

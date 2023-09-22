@@ -1,21 +1,11 @@
-﻿using System.Net;
-using System.Net.Security;
-using System.Net.Sockets;
-using Newtonsoft.Json;
-using System.Threading;
-using System.Text;
-using MyMinecraftServer;
-using System.Numerics;
-using System.Globalization;
-using Microsoft.VisualBasic;
-using System;
-using System.Security.Cryptography.X509Certificates;
-using System.Dynamic;
-using System.Linq;
-//using Utf8Json;
-using System.Security.Cryptography;
+﻿//using Utf8Json;
 using MessagePack;
+using MyMinecraftServer;
+using Newtonsoft.Json;
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Numerics;
 
 [MessagePackObject]
 public class ChunkData
@@ -124,7 +114,7 @@ public class UserData {
     }
     
 }*/
-public class Program
+public sealed class Program
 {
     static Form1 mainForm;
     static MessagePackSerializerOptions lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
@@ -133,15 +123,30 @@ public class Program
     public static string gameWorldDataPath= AppDomain.CurrentDomain.BaseDirectory;
     public static Dictionary<Vector2Int,Chunk> chunks= new Dictionary<Vector2Int,Chunk>();
     public static Dictionary<Vector2Int, ChunkData> chunkDataReadFromDisk = new Dictionary<Vector2Int, ChunkData>();
-    public static object listLock = new object();
-    public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int> toDoList2 = new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>();//双线程处理消息
+   /* public static object listLock = new object(); 
+    public static object listLock2 = new object();
+    public static object listLock3 = new object();
+    public static object listLock4 = new object();
+    public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int> toDoList2 = new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>();
     public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>,int> toDoList=new PriorityQueue<KeyValuePair<Socket, MessageProtocol>,int>();
+    public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int> toDoList3 = new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>();
+    public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int> toDoList4 = new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>();*/
+    public static List<object> listLocks = new List<object> { new object(), new object(),new object(), new object(), new object(), new object(), new object(), new object() };
+    public static List<PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>> toDoLists=new List<PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>> { 
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() , 
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() , 
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() , 
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>(), 
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() };//8线程
     public static IPAddress ip = IPAddress.Parse("0.0.0.0");
     public static int port = 11111;
     public static Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
     public static List<Socket> allClientSocketsOnline=new List<Socket>();
     public static List<UserData> allUserData=new List<UserData>();
-    static object listLock2 = new object();
+   
     static object chunkLock = new object();
     static object userDataLock = new object();
 
@@ -281,28 +286,63 @@ public class Program
         }
 
     }
+    public static void AppendMessage(Socket s,MessageProtocol mp)
+    {
+    Random rand=new Random();
+        var tdl = toDoLists[rand.Next(0, 4)];
+
+          
+                lock (listLocks[toDoLists.IndexOf(tdl)])
+                {
+                    //   object o= JsonConvert.DeserializeObject<object>(x);
+
+
+                    switch (mp.Command)
+                    {
+                        case 132:
+                            tdl.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 0);
+                            break;
+                        case 134:
+                            tdl.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 1);
+                            break;
+                        case 131:
+                            tdl.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 10);
+                            break;
+                        default:
+                            tdl.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 1);
+                            break;
+                    }
+
+                }
+            
+        
+    }
     public static async void RecieveClient(object socket)
     {
         Socket s = (Socket)socket;
+ MessageProtocol mp = null;
+                int ReceiveLength = 0;
+                byte[] staticReceiveBuffer = new byte[102400];  // 接收缓冲区(固定长度)
+                byte[] dynamicReceiveBuffer = new byte[] { };  // 累加数据缓存(不定长)
       //  byte[] bb = new byte[102400];
       //  ArraySegment<byte> b= new ArraySegment<byte>(bb);
         while(true)
         {
-            try
-            {//public int Receive (System.Collections.Generic.IList<ArraySegment<byte>> buffers);
-                if (s == null||s.Connected==false)
+            if (s == null||s.Connected==false)
                 {
                     mainForm.LogOnTextbox("Recieve client failed:socket closed");
                     return;
                 }
-           //     int count =s.Receive(bb);
-               
-                MessageProtocol mp = null;
-                int ReceiveLength = 0;
-                byte[] staticReceiveBuffer = new byte[102400];  // 接收缓冲区(固定长度)
-                byte[] dynamicReceiveBuffer = new byte[] { };  // 累加数据缓存(不定长)
+            try
+            {//public int Receive (System.Collections.Generic.IList<ArraySegment<byte>> buffers);
              
-                    ReceiveLength = s.Receive(staticReceiveBuffer);  // 同步接收数据
+                //     int count =s.Receive(bb);
+
+
+                // ReceiveLength = s.Receive(staticReceiveBuffer);
+
+              
+                ReceiveLength = s.Receive(staticReceiveBuffer);  // 同步接收数据
                     dynamicReceiveBuffer = MessageProtocol.CombineBytes(dynamicReceiveBuffer, 0, dynamicReceiveBuffer.Length, staticReceiveBuffer, 0, ReceiveLength);  // 将之前多余的数据与接收的数据合并,形成一个完整的数据包
                     if (ReceiveLength <= 0)  // 如果接收到的数据长度小于0(通常表示socket已断开,但也不一定,需要进一步判断,此处可以忽略)
                     {
@@ -323,7 +363,8 @@ public class Program
                      //       mainForm.LogOnTextbox("Message:"+mp.Command);
                             dynamicReceiveBuffer = mp.MoreData;  // 将拆包后得出多余的字节付给缓存变量,以待下一次循环处理数据时使用,若下一次循环缓存数据长度不能构成一个完整的数据包则不进入循环跳到外层循环继续接收数据并将本次得出的多余数据与之合并重新拆包,依次循环。
                             headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  // 从缓存中解读出下一次数据所需要的协议头信息,已准备下一次拆包循环,如果数据长度不能构成协议头所需的长度,拆包结果为0,下一次循环则不能成功进入,跳到外层循环继续接收数据合并缓存形成一个完整的数据包
-                            if (toDoList.Count > toDoList2.Count)
+                        AppendMessage(s, mp);
+                          /*  if (toDoList.Count > toDoList2.Count)
                             {
                                 lock (listLock2)
                                 {
@@ -347,35 +388,14 @@ public class Program
                                     }
 
                                 }
-                            }
-                            else
-                            {
-                                lock (listLock)
-                                {
-                                    //   object o= JsonConvert.DeserializeObject<object>(x);
-                                   
-                                    switch (mp.Command)
-                                    {
-                                        case 132:
-                                            toDoList.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 0);
-                                            break;
-                                        case 134:
-                                            toDoList.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 1);
-                                            break;
-                                        case 131:
-                                            toDoList.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 10);
-                                            break;
-                                        default:
-                                            toDoList.Enqueue(new KeyValuePair<Socket, MessageProtocol>(s, mp), 1);
-                                            break;
-                                    }
-
-                                }
-                            }
+                            }*/
+                       
 
 
                         } // 拆包循环结束
                     }
+                
+               
              
                 /* string str = System.Text.Encoding.UTF8.GetString(bb.ToArray(),0,count);
                  foreach (string x in str.Split('&'))
@@ -471,28 +491,30 @@ public class Program
         {
             Thread.Sleep(100);
             //  mainForm.LogOnTextbox("Update");
-            if (toDoList.Count < toDoList2.Count)
-            {
-            lock(listLock)
-            {
-                
-            toDoList.Enqueue(new KeyValuePair<Socket,MessageProtocol>(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update"))),10);
-                
-                    
-            }
-            }
-            else
-            {
-                lock (listLock2)
-                {
+            /*     if (toDoList.Count < toDoList2.Count)
+                 {
+                 lock(listLock)
+                 {
 
-                    toDoList2.Enqueue(new KeyValuePair<Socket, MessageProtocol>(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update"))), 10);
+                 toDoList.Enqueue(new KeyValuePair<Socket,MessageProtocol>(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update"))),10);
 
 
-                }
-            }
-         
-            
+                 }
+                 }
+                 else
+                 {
+                     lock (listLock2)
+                     {
+
+                         toDoList2.Enqueue(new KeyValuePair<Socket, MessageProtocol>(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update"))), 10);
+
+
+                     }
+                 }*/
+            AppendMessage(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update")));
+
+
+
         }
     }
     public static async void UserLogin(Socket s,byte[] data)
@@ -517,34 +539,24 @@ public class Program
     }
     public static void CastToAllClients(MessageProtocol msg)
     {
-        lock(allClientSocketsOnlineLock)
-        {
+        
             try
             {
-                foreach (Socket socket in allClientSocketsOnline)
+                for(int i=0;i<allClientSocketsOnline.Count;i++)
                 {
-                    if (socket != null && socket.Connected == true)
-                    {
-                        socket.Send(msg.GetBytes());
-                    }
+
+                allClientSocketsOnline[i].Send(msg.GetBytes());
+                   
 
                     //   socket.Send(System.Text.Encoding.Default.GetBytes("&"));
                 }
             }
             catch
             {
-                foreach (Socket socket in allClientSocketsOnline)
-                {
-                    if (socket != null && socket.Connected == true)
-                    {
-                        socket.Send(msg.GetBytes());
-                    }
-
-                    //   socket.Send(System.Text.Encoding.Default.GetBytes("&"));
-                }
+             
             }
        
-        }
+        
        
     }
    /* static void ServerConsoleControl()
@@ -629,6 +641,7 @@ public class Program
                     //message content type:Vector2int
                     case 134:
                         Vector2Int v = MessagePackSerializer.Deserialize<Vector2Int>(message.MessageData);
+                         //   mainForm.LogOnTextbox("chunkdata");
                             lock (chunkLock)
                             {
                             if (!chunks.ContainsKey(v))
@@ -650,7 +663,7 @@ public class Program
                         break;
                         //message content type:blockmodifydata
                         case 133:
-                            mainForm.LogOnTextbox("updateinternal");
+                    //        mainForm.LogOnTextbox("updateinternal");
                             BlockModifyData binternal = MessagePackSerializer.Deserialize<BlockModifyData>(message.MessageData);
                             if (GetChunk(Vec3ToChunkPos(new Vector3(binternal.x, binternal.y, binternal.z))) == null)
                             {
@@ -664,7 +677,7 @@ public class Program
                                 if (binternal.convertType == 0)
                                 {
                                     pd = new ParticleData((binternal.x)+0.5f,(binternal.y) + 0.5f, (binternal.z) + 0.5f, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z],false);
-                                    mainForm.LogOnTextbox("Emit");
+                            //        mainForm.LogOnTextbox("Emit");
                                 }
                                 else
                                 {
@@ -688,6 +701,7 @@ public class Program
                             break;
                     //message content type:blockmodifydata
                     case 132:
+                      //      mainForm.LogOnTextbox("updatechunk");
                         BlockModifyData b = MessagePackSerializer.Deserialize<BlockModifyData>(message.MessageData);
                         if (GetChunk(Vec3ToChunkPos(new Vector3(b.x, b.y, b.z))) == null)
                         {
@@ -701,7 +715,7 @@ public class Program
                                 if (b.convertType == 0)
                                 {
                                      pd = new ParticleData(b.x,b.y,b.z, GetChunk(x).map[(int)chunkSpacePos.X, (int)chunkSpacePos.Y, (int)chunkSpacePos.Z], false);
-                                    mainForm.LogOnTextbox("Emit");
+                      //              mainForm.LogOnTextbox("Emit");
                                 }
                                 else
                                 {
@@ -899,10 +913,17 @@ public class Program
         Thread updateThread = new Thread(() => UpdateData());
         updateThread.Start();
 
-        Thread executeThread = new Thread(() => ExecuteToDoList(toDoList, listLock));
+      /*  Thread executeThread = new Thread(() => ExecuteToDoList(toDoList, listLock));
         executeThread.Start();
         Thread executeThread2 = new Thread(() => ExecuteToDoList(toDoList2, listLock2));
-        executeThread2.Start();
+        executeThread2.Start();*/
+      foreach(var tdl in toDoLists)
+        {
+          //  Debug.WriteLine(toDoLists.Count);
+            Debug.WriteLine(listLocks.Count);
+            Thread executeThread = new Thread(() => ExecuteToDoList(tdl, listLocks[toDoLists.IndexOf(tdl)]));
+            executeThread.Start();
+        }
         mainForm.LogOnTextbox("Server Started! IP:"+ip.ToString()+":"+port.ToString());
       //  Thread ServerConsoleControlThread = new Thread(() => ServerConsoleControl());
      //   ServerConsoleControlThread.Start();

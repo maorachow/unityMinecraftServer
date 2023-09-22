@@ -14,7 +14,7 @@ public class PlayerMove : MonoBehaviour
     public GameObject blockOutlineInBlock;
     public GameObject blockOutlineColliding;
     public static GameObject chunkPrefab;
-    public static int viewRange=32;
+    public static int viewRange=128;
     public static float mouseSens=10f;
     public Vector3 prePos;
     public Vector3 nowPos;

@@ -58,7 +58,7 @@ public class Chunk : MonoBehaviour
      public static int chunkSeaLevel=63;
     public static int chunkWidth=16;
     public static int chunkHeight=256;
-    public bool isChunkMessageSent=false;
+  //  public bool isChunkMessageSent=false;
      public Vector3[] opqVerts;
     public Vector2[] opqUVs;
     public int[] opqTris;
@@ -67,11 +67,11 @@ public class Chunk : MonoBehaviour
     public int[] NSTris;
     public Vector2Int chunkPos;
     void InvokeGetMap(){
-        if(map==null&&chunks.ContainsKey(chunkPos)&&isChunkMessageSent==false){
+        if(map==null){
             Debug.Log("null");
-            NetworkProgram.SendMessageToServer(new MessageProtocol(137,MessagePackSerializer.Serialize(chunkPos)));
+      //      NetworkProgram.SendMessageToServer(new MessageProtocol(134,MessagePackSerializer.Serialize(chunkPos)));
          //   BuildChunk();
-            isChunkMessageSent=true;
+         //   isChunkMessageSent=true;
         }
     }
 

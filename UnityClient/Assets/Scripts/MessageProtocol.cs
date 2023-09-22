@@ -90,6 +90,7 @@ public sealed class MessageProtocol
         ms.Close();
         return (bytes);
     }
+    
     public static (byte Command, int DataLength) GetHeadInfo(byte[] buffer)  // 读取协议头部分
     {
         (byte Command, int DataLength) returnValue = (0, 0);
