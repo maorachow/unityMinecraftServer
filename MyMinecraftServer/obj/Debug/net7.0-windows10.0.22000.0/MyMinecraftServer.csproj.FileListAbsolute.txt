@@ -11,6 +11,8 @@ D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net7.0-windows10.0.22000.0\M
 D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net7.0-windows10.0.22000.0\WinRT.Runtime.dll
 D:\unityMinecraftServer\MyMinecraftServer\bin\Debug\net7.0-windows10.0.22000.0\Newtonsoft.Json.dll
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.csproj.AssemblyReference.cache
+D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.Form1.resources
+D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.csproj.GenerateResource.cache
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.GeneratedMSBuildEditorConfig.editorconfig
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.AssemblyInfoInputs.cache
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.AssemblyInfo.cs
@@ -21,5 +23,3 @@ D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\r
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.pdb
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.genruntimeconfig.cache
 D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\ref\MyMinecraftServer.dll
-D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.csproj.GenerateResource.cache
-D:\unityMinecraftServer\MyMinecraftServer\obj\Debug\net7.0-windows10.0.22000.0\MyMinecraftServer.Form1.resources

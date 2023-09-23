@@ -8,12 +8,13 @@ public class AllPlayersManager : MonoBehaviour
 {
     public static bool isPlayerDataUpdated=false;
     public static Dictionary<string,GameObject> playerPrefabsInClient=new Dictionary<string,GameObject>();
+    public static Transform curPlayerTrans;
     public static GameObject playerPrefab;
     public static List<UserData> clientPlayerList=new List<UserData>();
     public static void InitPlayerManager(){
         playerPrefabsInClient=new Dictionary<string,GameObject>();
         clientPlayerList=new List<UserData>();
-       
+        curPlayerTrans=null;
     }
     public void RemovePlayer(){
             List<KeyValuePair<string,GameObject>> toDestroy=new List<KeyValuePair<string,GameObject>>();
@@ -43,6 +44,9 @@ public class AllPlayersManager : MonoBehaviour
             if(u.userName==NetworkProgram.clientUserName){
                pm.isCurrentPlayer=true;
                  playerPrefabsInClient[u.userName].transform.GetChild(1).GetChild(0).GetComponent<MeshRenderer>().enabled=false;
+                 if(curPlayerTrans==null){
+                    curPlayerTrans=pm.transform;
+                 }
                  continue;
                  }
                  playerPrefabsInClient[u.userName].transform.GetChild(1).GetChild(0).GetComponent<MeshRenderer>().enabled=true;

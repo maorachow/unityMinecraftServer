@@ -191,11 +191,13 @@ public sealed class Program
             c.Value.SaveSingleChunk();
         }
      
-        foreach (KeyValuePair<Vector2Int, ChunkData> wd in chunkDataReadFromDisk)
-        {
-            string tmpData = JsonConvert.SerializeObject(wd.Value);
-            File.AppendAllText(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json", tmpData + "\n");
-        }
+    //    foreach (KeyValuePair<Vector2Int, ChunkData> wd in chunkDataReadFromDisk)
+     //   {
+      //      string tmpData = JsonConvert.SerializeObject(wd.Value);
+            
+        //    }
+        byte[] allWorldData=MessagePackSerializer.Serialize(chunkDataReadFromDisk);
+            File.WriteAllBytes(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json",allWorldData);
         isWorldDataSaved = true;
     }
     public static void ReadJson()
@@ -219,8 +221,8 @@ public sealed class Program
             fs.Close();
         }
 
-        string[] worldData = File.ReadAllLines(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json");
-        List<ChunkData> tmpList = new List<ChunkData>();
+        byte[] worldData = File.ReadAllBytes(gameWorldDataPath + "unityMinecraftServerData/GameData/world.json");
+      /*  List<ChunkData> tmpList = new List<ChunkData>();
         foreach (string s in worldData)
         {
             ChunkData tmp = JsonConvert.DeserializeObject<ChunkData>(s);
@@ -229,7 +231,12 @@ public sealed class Program
         foreach (ChunkData w in tmpList)
         {
             chunkDataReadFromDisk.Add(new Vector2Int(w.chunkPos.x, w.chunkPos.y), w);
+        }*/
+      if(worldData.Length > 0)
+        {
+chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,ChunkData>>(worldData);
         }
+      
         isJsonReadFromDisk = true;
     }
     public static void socketWait(Socket socket)

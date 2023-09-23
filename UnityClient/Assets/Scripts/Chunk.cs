@@ -8,8 +8,92 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 using MessagePack;
+using Unity.Jobs;
+using Unity.Collections;
+using Unity.Burst;
+using UnityEngine.Rendering;
+using Unity.Collections;
 public class Chunk : MonoBehaviour
 {
+
+
+   [BurstCompile(CompileSynchronously = true)]
+    public struct BakeJob:IJobParallelFor{
+        public NativeArray<int> meshes;
+        public void Execute(int index){
+            Physics.BakeMesh(meshes[index],false);
+        }
+    }
+
+    public struct Vertex{
+        public Vector3 pos;
+        public Vector3 normal;
+        public Vector2 uvPos;
+        public Vertex(Vector3 v3,Vector3 nor,Vector2 v2){
+            pos=v3;
+            normal=nor;
+            uvPos=v2; 
+        }
+    }
+     [BurstCompile(CompileSynchronously = true)]
+     public struct MeshBuildJob:IJob{
+       // public NativeArray<VertexAttributeDescriptor> vertexAttributes;
+        public NativeArray<Vector3> verts;
+        public NativeArray<Vector2> uvs;
+        public NativeArray<int> tris;
+       // public NativeArray<VertexAttributeDescriptor> vertsDes;
+        //    public int vertLen;
+       //     public int uvsLen;
+         //   public int trisLen;
+            public Mesh.MeshDataArray dataArray;
+         public void Execute(){
+             // Allocate mesh data for one mesh.
+      //  dataArray = Mesh.AllocateWritableMeshData(1);
+        var data = dataArray[0];
+        // Tetrahedron vertices with positions and normals.
+        // 4 faces with 3 unique vertices in each -- the faces
+        // don't share the vertices since normals have to be
+        // different for each face.
+         /*   */
+    /*    data.SetVertexBufferParams(vertLen,new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2)
+       );*/
+        // Four tetrahedron vertex positions:
+   //     var sqrt075 = Mathf.Sqrt(0.75f);
+   //     var p0 = new Vector3(0, 0, 0);
+   //     var p1 = new Vector3(1, 0, 0);
+   //     var p2 = new Vector3(0.5f, 0, sqrt075);
+   //     var p3 = new Vector3(0.5f, sqrt075, sqrt075 / 3);
+        // The first vertex buffer data stream is just positions;
+        // fill them in.
+        var pos = data.GetVertexData<Vertex>();
+      //  pos=verts;
+        for(int i=0;i<pos.Length;i++){
+            pos[i]=new Vertex(verts[i],new Vector3(1f,1f,1f),uvs[i]);
+           
+        }
+        // Note: normals will be calculated later in RecalculateNormals.
+        // Tetrahedron index buffer: 4 triangles, 3 indices per triangle.
+        // All vertices are unique so the index buffer is just a
+        // 0,1,2,...,11 sequence.
+    //    data.SetIndexBufferParams(verts.Length, IndexFormat.UInt16);
+       data.SetIndexBufferParams((int)(pos.Length/2)*3, IndexFormat.UInt32);
+        var ib = data.GetIndexData<int>();
+        for (int i = 0; i < ib.Length; ++i)
+            ib[i] = tris[i];
+        // One sub-mesh with all the indices.
+        data.subMeshCount = 1;
+        data.SetSubMesh(0, new SubMeshDescriptor(0, ib.Length));
+        // Create the mesh and apply data to it:
+     //   Debug.Log("job");
+  //   int threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+   //        UnityEngine.Debug.Log(threadId == 1 ? "Main thread" : $"Worker thread {threadId}");
+           pos.Dispose();
+           ib.Dispose();
+        }
+
+    }
     public bool isChunkBuilding=false;
     public bool isChunkUpdated=false;
     public bool isWaitingForNewChunkData=false;
@@ -41,7 +125,7 @@ public class Chunk : MonoBehaviour
     public Chunk backRightChunk;
     public static Dictionary<int,AudioClip> blockAudioDic=new Dictionary<int,AudioClip>();
    public delegate bool TmpCheckFace(int x,int y,int z);
-    public delegate void TmpBuildFace(int typeid, Vector3 corner, Vector3 up, Vector3 right, bool reversed, List<Vector3> verts, List<Vector2> uvs, List<int> tris, int side);
+    public delegate void TmpBuildFace(int typeid, Vector3 corner, Vector3 up, Vector3 right, bool reversed, NativeList<Vector3> verts, NativeList<Vector2> uvs, NativeList<int> tris, int side);
      public static Dictionary<int,List<Vector2>> itemBlockInfo=new Dictionary<int,List<Vector2>>();
     public static Dictionary<int,List<Vector2>> blockInfo=new Dictionary<int,List<Vector2>>();
     public static Dictionary<Vector2Int,Chunk> chunks=new Dictionary<Vector2Int,Chunk>();
@@ -66,15 +150,18 @@ public class Chunk : MonoBehaviour
     public Vector2[] NSUVs;
     public int[] NSTris;
     public Vector2Int chunkPos;
-    void InvokeGetMap(){
-        if(map==null){
-            Debug.Log("null");
-      //      NetworkProgram.SendMessageToServer(new MessageProtocol(134,MessagePackSerializer.Serialize(chunkPos)));
-         //   BuildChunk();
-         //   isChunkMessageSent=true;
-        }
-    }
-
+    public NativeArray<Vector3> opqVertsNative;
+    public NativeArray<Vector2> opqUVsNative;
+    public NativeArray<int> opqTrisNative;
+    public NativeArray<Vector3> NSVertsNative;
+    public NativeArray<Vector2> NSUVsNative;
+    public NativeArray<int> NSTrisNative;
+        NativeList<Vector3> vertsNS ;
+        NativeList<Vector2> uvsNS ;
+        NativeList<int> trisNS;
+        NativeList<Vector3> verts;
+        NativeList<Vector2> uvs;
+        NativeList<int> tris ;
     public static void AddBlockInfo(){
         //left right bottom top back front
         blockAudioDic.TryAdd(0,null);
@@ -131,19 +218,33 @@ public class Chunk : MonoBehaviour
        
     }
 
-    void OnEnable(){
+    void ReInitData(){
         chunkPos=new Vector2Int((int)transform.position.x,(int)transform.position.z);
+        isChunkPosInited=true;
 
        // instance=this;
+       if(chunks.ContainsKey(chunkPos)){
+        chunks.Remove(chunkPos);
+        chunks.Add(chunkPos,this);
+       }
+        chunks.TryAdd(chunkPos,this);
+        Debug.Log(chunks.Count);
        
-         chunks.TryAdd(chunkPos,this);
-       Debug.Log(chunks.Count);
-       
-        meshFilter=GetComponent<MeshFilter>();
-        meshCollider=GetComponent<MeshCollider>();
-        InvokeRepeating("InvokeGetMap",1f,0.5f);
+        //meshFilter=GetComponent<MeshFilter>();
+       // meshCollider=GetComponent<MeshCollider>();
+       // InvokeRepeating("InvokeGetMap",1f,0.5f);
     }
 
+    void OnDisable(){
+      //  CancelInvoke();
+        chunks.Remove(chunkPos);
+
+         chunkPos=new Vector2Int(-10240,-10240);
+         
+         isChunkPosInited=false;
+         isChunkDataDownloaded=false;
+        isChunkUpdated=false;
+    }
        void  ClientInitMap(Vector2Int pos){
       //  Thread.Sleep(1000);
         frontChunk=GetChunk(new Vector2Int(chunkPos.x,chunkPos.y+chunkWidth));
@@ -160,24 +261,24 @@ public class Chunk : MonoBehaviour
      
        
        // await Task.Run(()=>{while(frontChunk==null||backChunk==null||leftChunk==null||rightChunk==null){}});
-        List<Vector3> vertsNS = new List<Vector3>();
-        List<Vector2> uvsNS = new List<Vector2>();
-        List<int> trisNS = new List<int>();
-        List<Vector3> verts = new List<Vector3>();
-        List<Vector2> uvs = new List<Vector2>();
-        List<int> tris = new List<int>();
+    
 
     
    //     FreshGenMap(pos);
         
-      
+    vertsNS = new NativeList<Vector3>(Allocator.TempJob);
+     uvsNS = new NativeList<Vector2>(Allocator.TempJob);
+    trisNS = new NativeList<int>(Allocator.TempJob);
+     verts = new NativeList<Vector3>(Allocator.TempJob);
+   uvs = new NativeList<Vector2>(Allocator.TempJob);
+   tris = new NativeList<int>(Allocator.TempJob);
         
 
         GenerateMesh(verts,uvs,tris,vertsNS,uvsNS,trisNS);
    
     }
 
-     public void GenerateMesh(List<Vector3> verts, List<Vector2> uvs, List<int> tris, List<Vector3> vertsNS, List<Vector2> uvsNS, List<int> trisNS){
+     public void GenerateMesh(NativeList<Vector3> verts, NativeList<Vector2> uvs, NativeList<int> tris, NativeList<Vector3> vertsNS, NativeList<Vector2> uvsNS, NativeList<int> trisNS){
      //   Thread.Sleep(10);
          TmpCheckFace tmp=new TmpCheckFace(CheckNeedBuildFace);
         TmpBuildFace TmpBuildFace=new TmpBuildFace(BuildFace);
@@ -337,13 +438,24 @@ public class Chunk : MonoBehaviour
                 }
             }
         }
-        opqVerts=verts.ToArray();
-        opqUVs=uvs.ToArray();
-        opqTris=tris.ToArray();
-        NSVerts=vertsNS.ToArray();
-        NSUVs=uvsNS.ToArray();
-        NSTris=trisNS.ToArray();
-        
+       // opqVerts=verts.ToArray();
+      //  opqUVs=uvs.ToArray();
+      //  opqTris=tris.ToArray();
+       // NSVerts=vertsNS.ToArray();
+       // NSUVs=uvsNS.ToArray();
+       // NSTris=trisNS.ToArray();
+        opqVertsNative=verts.AsArray();
+        opqUVsNative=uvs.AsArray();
+        opqTrisNative=tris.AsArray();
+        NSVertsNative=vertsNS.AsArray();
+        NSUVsNative=uvsNS.AsArray();
+        NSTrisNative=trisNS.AsArray();
+    /*    verts.Dispose();
+        uvs.Dispose();
+        tris.Dispose();
+        vertsNS.Dispose();
+        uvsNS.Dispose();
+        trisNS.Dispose();*/
         isMeshBuildCompleted=true;
     }
 
@@ -416,8 +528,8 @@ public class Chunk : MonoBehaviour
 
 
 
-     void BuildFace(int typeid, Vector3 corner, Vector3 up, Vector3 right, bool reversed, List<Vector3> verts, List<Vector2> uvs, List<int> tris, int side){
-        int index = verts.Count;
+     void BuildFace(int typeid, Vector3 corner, Vector3 up, Vector3 right, bool reversed, NativeList<Vector3> verts, NativeList<Vector2> uvs, NativeList<int> tris, int side){
+        int index = verts.Length ;
     
         verts.Add (corner);
         verts.Add (corner + up);
@@ -457,6 +569,11 @@ public class Chunk : MonoBehaviour
 
     public async void BuildChunk()
     {
+   //  System.Diagnostics.Stopwatch stopWatch = new System.Diagnostics.Stopwatch();
+ 
+      //  stopWatch.Start();
+     
+       
         isChunkBuilding=true;
   //  Debug.Log("BuildChunk");
     if(map==null){
@@ -468,22 +585,74 @@ public class Chunk : MonoBehaviour
     chunkNonSolidMesh=new Mesh();
     
     await Task.Run(()=>{ClientInitMap(chunkPos);});
+    
+    NativeArray<VertexAttributeDescriptor> vertsDesNative=new NativeArray<VertexAttributeDescriptor>(new VertexAttributeDescriptor[]{
+        new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2)
+    },Allocator.TempJob);
+ /*    NativeArray<Vector3> vertsNative=new NativeArray<Vector3>(opqVerts,Allocator.TempJob);
+     NativeArray<Vector2> uvsNative=new NativeArray<Vector2>(opqUVs,Allocator.TempJob);
+     NativeArray<int> trisNative=new NativeArray<int>(opqTris,Allocator.TempJob);
+     NativeArray<Vector3> vertsNSNative=new NativeArray<Vector3>(NSVerts,Allocator.TempJob);
+     NativeArray<Vector2> uvsNSNative=new NativeArray<Vector2>(NSUVs,Allocator.TempJob);
+     NativeArray<int> trisNSNative=new NativeArray<int>(NSTris,Allocator.TempJob);*/
+     NativeArray<int> meshesIDNative=new NativeArray<int>(new int[]{chunkMesh.GetInstanceID()},Allocator.TempJob);
+    Mesh.MeshDataArray mda=Mesh.AllocateWritableMeshData(1);
+    Mesh.MeshDataArray mdaNS=Mesh.AllocateWritableMeshData(1);
+    await Task.Run(()=>{mda[0].SetVertexBufferParams(opqVertsNative.Length,new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2));
+            mdaNS[0].SetVertexBufferParams(NSVertsNative.Length,new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2));});
+    
+   
   
-                
-    chunkMesh.vertices =opqVerts;
-    chunkMesh.uv = opqUVs;
-    chunkMesh.triangles = opqTris;
+    MeshBuildJob mbj=new MeshBuildJob{verts=opqVertsNative,uvs=opqUVsNative,tris=opqTrisNative,dataArray=mda};
+    JobHandle jhmbj=mbj.Schedule();
+     MeshBuildJob mbjNS=new MeshBuildJob{verts=NSVertsNative,uvs=NSUVsNative,tris=NSTrisNative,dataArray=mdaNS};
+    
+    JobHandle jhmbjNS=mbjNS.Schedule();
+    JobHandle.CompleteAll(ref jhmbj,ref jhmbjNS);
+    Mesh.ApplyAndDisposeWritableMeshData(mbj.dataArray,chunkMesh,MeshUpdateFlags.DontValidateIndices);
+    Mesh.ApplyAndDisposeWritableMeshData(mbjNS.dataArray,chunkNonSolidMesh,MeshUpdateFlags.DontValidateIndices);
+  //  chunkMesh.vertices =opqVerts;
+  //  chunkMesh.uv = opqUVs;
+ //   chunkMesh.triangles = opqTris;
     chunkMesh.RecalculateBounds();
     chunkMesh.RecalculateNormals();
-    chunkNonSolidMesh.vertices =NSVerts;
-    chunkNonSolidMesh.uv = NSUVs;
-    chunkNonSolidMesh.triangles = NSTris;
+  //  chunkNonSolidMesh.vertices =NSVerts;
+  //  chunkNonSolidMesh.uv = NSUVs;
+ //   chunkNonSolidMesh.triangles = NSTris;
     chunkNonSolidMesh.RecalculateBounds();
     chunkNonSolidMesh.RecalculateNormals();
+   
+    
+ BakeJob bj=new BakeJob{meshes=meshesIDNative};
+    JobHandle bjHandle = bj.Schedule(meshesIDNative.Length, 1);
+   bjHandle.Complete();
+   Task.Run(()=>{
+        opqVertsNative.Dispose();
+        opqUVsNative.Dispose();
+        opqTrisNative.Dispose();
+        NSVertsNative.Dispose();
+        NSUVsNative.Dispose();
+        NSTrisNative.Dispose();
+        meshesIDNative.Dispose();
+             verts.Dispose();
+        uvs.Dispose();
+        tris.Dispose();
+        vertsNS.Dispose();
+        uvsNS.Dispose();
+        trisNS.Dispose();
+    });
     meshFilter.mesh = chunkMesh;
     meshFilterNS.mesh=chunkNonSolidMesh;
     meshCollider.sharedMesh = chunkMesh;
     isChunkBuilding=false;
+  //  stopWatch.Stop();
+   // Debug.Log("time used: " +stopWatch.ElapsedMilliseconds);
     }
 
 /*void BuildBlock(int x, int y, int z, List<Vector3> verts, List<Vector2> uvs, List<int> tris)
@@ -627,6 +796,19 @@ public class Chunk : MonoBehaviour
         BuildChunk();
         isChunkUpdated=false;
     }
+    }
+    void FixedUpdate(){
+        TryReleaseChunk();
+    }
+    void TryReleaseChunk(){
+
+        if(AllPlayersManager.curPlayerTrans==null||!isChunkPosInited){
+            return;
+        }
+        Vector3 pos=AllPlayersManager.curPlayerTrans.position;
+        if((Mathf.Abs(pos.x-chunkPos.x)>PlayerMove.viewRange+chunkWidth||Mathf.Abs(pos.z-chunkPos.y)>PlayerMove.viewRange+chunkWidth)&&isChunkPosInited==true){
+            ObjectPools.chunkPool.Remove(this.gameObject);
+        }
     }
     public static Vector2Int Vec3ToChunkPos(Vector3 pos){
         Vector3 tmp=pos;

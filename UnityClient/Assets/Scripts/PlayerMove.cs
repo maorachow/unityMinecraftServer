@@ -71,10 +71,11 @@ public class PlayerMove : MonoBehaviour
                 Vector2Int chunkPos=Chunk.Vec3ToChunkPos(pos);
                 Chunk chunk = Chunk.GetChunk(chunkPos);
                 if (chunk != null) {continue;}else{
-                  chunk=Instantiate(chunkPrefab,new Vector3(chunkPos.x,0f,chunkPos.y),Quaternion.identity).GetComponent<Chunk>();
-               //     chunk.transform.position=new Vector3(chunkPos.x,0,chunkPos.y);
-               //     chunk.isChunkPosInited=true;
-                //    Debug.Log("genChunk");
+                  chunk=ObjectPools.chunkPool.Get(chunkPos).GetComponent<Chunk>();
+                    chunk.transform.position=new Vector3(chunkPos.x,0,chunkPos.y);
+                    chunk.isChunkPosInited=true;
+                 //   Debug.Log("genChunk");
+                 chunk.SendMessage("ReInitData");
                  await Task.Delay(30);
                  NetworkProgram.SendMessageToServer(new MessageProtocol(134,MessagePackSerializer.Serialize(chunkPos,NetworkProgram.lz4Options)));
          //          WorldManager.chunksToLoad.Add(chunk);
@@ -179,9 +180,9 @@ public class PlayerMove : MonoBehaviour
         
         headTrans.rotation=Quaternion.Euler(new Vector3(cameraX,headTrans.eulerAngles.y,0f));
         headTrans.eulerAngles+=new Vector3(0f,x,0f);
-        playerMoveRef.eulerAngles=new Vector3(0f,playerMoveRef.eulerAngles.y,0f);
+        playerMoveRef.eulerAngles=new Vector3(0f,headTrans.eulerAngles.y,0f);
         bodyTrans.rotation=Quaternion.Lerp(bodyTrans.rotation,playerMoveRef.rotation,5f*Time.deltaTime);
-           if(Chunk.GetChunk(Chunk.Vec3ToChunkPos(transform.position))==null||Chunk.GetChunk(Chunk.Vec3ToChunkPos(transform.position)).isChunkDataDownloaded==false){
+           if(Chunk.GetChunk(Chunk.Vec3ToChunkPos(transform.position))==null||Chunk.GetChunk(Chunk.Vec3ToChunkPos(transform.position)).isChunkDataDownloaded==false||Chunk.GetChunk(Chunk.Vec3ToChunkPos(transform.position)).isChunkUpdated==true){
             return;
         }
         if(cc.isGrounded==true){

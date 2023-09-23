@@ -156,8 +156,8 @@ public class NetworkProgram : MonoBehaviour
             return;
         }
         if(toDoList.Count>0){
-            
-            MessageProtocol m=toDoList.Peek();
+            lock(listLock){
+                   MessageProtocol m=toDoList.Peek();
             if(m==null){
                 Debug.Log("Empty message");
                    toDoList.Dequeue();
@@ -184,22 +184,24 @@ public class NetworkProgram : MonoBehaviour
               //          UnityEngine.Debug.Log("Server:"+ m.MessageData);
               //          break;
                     case 128:
-                    ChunkData cd= MessagePackSerializer.Deserialize<ChunkData>(m.MessageData,lz4Options);
-                    if(!Chunk.chunks.ContainsKey(cd.chunkPos)){
-                        break;
+                    
+                    Task.Run(()=>{ChunkData cd= MessagePackSerializer.Deserialize<ChunkData>(m.MessageData,lz4Options);    
+                     if(!Chunk.chunks.ContainsKey(cd.chunkPos)){
+                     return;
                     }else{
                    
                         Chunk.chunks[cd.chunkPos].map=cd.map;
                         Chunk.chunks[cd.chunkPos].isChunkUpdated=true;
                          Chunk.chunks[cd.chunkPos].isChunkDataDownloaded=true;
                         Chunk.chunks[cd.chunkPos].isWaitingForNewChunkData=false;
-                    }
+                    }});
+               
 
                             
                     break;
                     case 139:
 
-                    Task.Run(()=> {BlockModifyData b = MessagePackSerializer.Deserialize<BlockModifyData>(m.MessageData,lz4Options);
+                     Task.Run(()=> {BlockModifyData b = MessagePackSerializer.Deserialize<BlockModifyData>(m.MessageData,lz4Options);
                     Vector2Int cPos = Chunk.Vec3ToChunkPos(new Vector3(b.x, b.y, b.z));
                     Vector3 chunkSpacePos = new Vector3(b.x, b.y, b.z) - new Vector3(cPos.x, 0, cPos.y);
                     if(Chunk.GetChunk(cPos) == null){
@@ -215,7 +217,7 @@ public class NetworkProgram : MonoBehaviour
                             
                         break;
                     case 138:
-                    Debug.Log("emit");
+               
                     ParticleData pd=MessagePackSerializer.Deserialize<ParticleData>(m.MessageData,lz4Options);
                     particleAndEffectBeh.SpawnParticle(new UnityEngine.Vector3(pd.posX,pd.posY,pd.posZ),pd.type,pd.isSoundOnly);
                     break;
@@ -230,7 +232,9 @@ public class NetworkProgram : MonoBehaviour
                         break;
                         }
                       
-                       toDoList.Dequeue();     
+                       toDoList.Dequeue();   
+            }
+           
                         
                         
         }
@@ -266,7 +270,7 @@ public class NetworkProgram : MonoBehaviour
             else  // 缓存中的数据大于等于协议头的长度
             {
             var headInfo = MessageProtocol.GetHeadInfo(dynamicReceiveBuffer);  
-            Debug.Log(headInfo.DataLength);
+          //  Debug.Log(headInfo.DataLength);
             // 解读协议头的信息
              while (dynamicReceiveBuffer.Length - MessageProtocol.HEADLENGTH >= headInfo.DataLength)  // 当缓存数据长度减去协议头长度大于等于实际数据的长度则进入循环进行拆包处理
                 {
