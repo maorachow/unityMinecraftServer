@@ -51,15 +51,15 @@ namespace MyMinecraftServer
 
         private void button3_Click(object sender, EventArgs e)
         {
-          foreach(var tdl in Program.toDoLists)
+            foreach (var tdl in Program.toDoLists)
             {
-                LogOnTextbox("Messages In List "+Program.toDoLists.IndexOf(tdl).ToString()+" Count: "+tdl.Count.ToString());
+                LogOnTextbox("Messages In List " + Program.toDoLists.IndexOf(tdl).ToString() + " Count: " + tdl.Count.ToString());
             }
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
-          LogOnTextbox("Chunks Count:"+Program.chunks.Count.ToString());
+            LogOnTextbox("Chunks Count:" + Program.chunks.Count.ToString());
 
 
         }
@@ -121,7 +121,9 @@ namespace MyMinecraftServer
             setControls(xMultiplier, yMultiplier, this);
         }
 
-
-
+        private void button4_Click(object sender, EventArgs e)
+        {
+            EntityBeh.SpawnNewEntity(new System.Numerics.Vector3(0f, 100f, 0f),0f,0f,0f, 0);
+        }
     }
 }

@@ -98,6 +98,7 @@ public class Chunk : MonoBehaviour
     public bool isChunkUpdated=false;
     public bool isWaitingForNewChunkData=false;
    public static FastNoise noiseGenerator=new FastNoise();
+     public static FastNoise biomeNoiseGenerator=new FastNoise();
     //0None 1Stone 2Grass 3Dirt 4Side grass block 5Bedrock 6WoodX 7WoodY 8WoodZ 9Leaves 10Diamond Ore
   //100Water 101Grass
   //200Leaves
@@ -149,6 +150,7 @@ public class Chunk : MonoBehaviour
     public Vector3[] NSVerts;
     public Vector2[] NSUVs;
     public int[] NSTris;
+    public float[,] chunkHeightMap;
     public Vector2Int chunkPos;
     public NativeArray<Vector3> opqVertsNative;
     public NativeArray<Vector2> opqUVsNative;
@@ -202,7 +204,7 @@ public class Chunk : MonoBehaviour
         itemBlockInfo.TryAdd(8,new List<Vector2>{new Vector2(0.5f,0f),new Vector2(0.5f,0f),new Vector2(0.5f,0f),new Vector2(0.5f,0f),new Vector2(0.25f,0f),new Vector2(0.25f,0f)});
         itemBlockInfo.TryAdd(9,new List<Vector2>{new Vector2(0.4375f,0f),new Vector2(0.4375f,0f),new Vector2(0.4375f,0f),new Vector2(0.4375f,0f),new Vector2(0.4375f,0f),new Vector2(0.4375f,0f)});
         isBlockInfoAdded=true;
-
+       biomeNoiseGenerator.SetFrequency(0.002f);
     }
      void Awake(){
        // playerPos=GameObject.FindGameObjectWithTag("Player").GetComponent<Transform>();
@@ -245,6 +247,77 @@ public class Chunk : MonoBehaviour
          isChunkDataDownloaded=false;
         isChunkUpdated=false;
     }
+
+
+
+       public static int[,] GenerateChunkBiomeMap(Vector2Int pos){
+        //   float[,] biomeMap=new float[chunkWidth/8+2,chunkWidth/8+2];//插值算法
+       //      int[,] chunkBiomeMap=GenerateChunkBiomeMap(pos);
+            int[,] biomeMapInter=new int[chunkWidth/8+2,chunkWidth/8+2];
+            for(int i=0;i<chunkWidth/8+2;i++){
+                for(int j=0;j<chunkWidth/8+2;j++){
+         //           Debug.DrawLine(new Vector3(pos.x+(i-1)*8,60f,pos.y+(j-1)*8),new Vector3(pos.x+(i-1)*8,150f,pos.y+(j-1)*8),Color.green,1f);
+                //    if(RandomGenerator3D.GenerateIntFromVec3(new Vector3Int()))
+          
+                biomeMapInter[i,j]=(int)(1f+biomeNoiseGenerator.GetSimplex(pos.x+(i-1)*8,pos.y+(j-1)*8)*3f);
+                }
+            }//32,32
+          
+           
+  
+        return biomeMapInter;
+    }
+     public static float[,] GenerateChunkHeightmap(Vector2Int pos){
+             float[,] heightMap=new float[chunkWidth/8+2,chunkWidth/8+2];//插值算法
+             int[,] chunkBiomeMap=GenerateChunkBiomeMap(pos);
+
+            for(int i=0;i<chunkWidth/8+2;i++){
+                for(int j=0;j<chunkWidth/8+2;j++){
+         //           Debug.DrawLine(new Vector3(pos.x+(i-1)*8,60f,pos.y+(j-1)*8),new Vector3(pos.x+(i-1)*8,150f,pos.y+(j-1)*8),Color.green,1f);
+                //    if(RandomGenerator3D.GenerateIntFromVec3(new Vector3Int()))
+
+                heightMap[i,j]=chunkSeaLevel+noiseGenerator.GetSimplex(pos.x+(i-1)*8,pos.y+(j-1)*8)*20f+chunkBiomeMap[i,j]*25f;
+                }
+
+            }//32,32
+            int interMultiplier=8;
+            float[,] heightMapInterpolated=new float[(chunkWidth/8+2)*interMultiplier,(chunkWidth/8+2)*interMultiplier];
+        for(int i=0;i<(chunkWidth/8+2)*interMultiplier;++i){
+                for(int j=0;j<(chunkWidth/8+2)*interMultiplier;++j){
+                        int x=i;
+                        int y=j;
+                        float x1=(i/interMultiplier)*interMultiplier;
+                        float x2=(i/interMultiplier)*interMultiplier+interMultiplier;
+                        float y1=(j/interMultiplier)*interMultiplier;
+                        float y2=(j/interMultiplier)*interMultiplier+interMultiplier;
+                        int x1Ori=(i/interMultiplier);
+                       // Debug.Log(x1Ori);
+                        int x2Ori=(i/interMultiplier)+1;
+                        x2Ori=Mathf.Clamp(x2Ori,0,(chunkWidth/8+2)-1);
+                      //   Debug.Log(x2Ori);
+                        int y1Ori=(j/interMultiplier);
+                      //   Debug.Log(y1Ori);
+                        int y2Ori=(j/interMultiplier)+1;
+                         y2Ori=Mathf.Clamp(y2Ori,0,(chunkWidth/8+2)-1);
+                    //     Debug.Log(y2Ori);
+                    
+                        float q11=heightMap[x1Ori,y1Ori];
+                        float q12=heightMap[x1Ori,y2Ori];
+                        float q21=heightMap[x2Ori,y1Ori];
+                        float q22=heightMap[x2Ori,y2Ori];
+                        float fxy1=(float)(x2-x)/(x2-x1)*q11+(float)(x-x1)/(x2-x1)*q21;
+                        float fxy2=(float)(x2-x)/(x2-x1)*q12+(float)(x-x1)/(x2-x1)*q22;
+                        float fxy=(float)(y2-y)/(y2-y1)*fxy1+(float)(y-y1)/(y2-y1)*fxy2;
+                        heightMapInterpolated[x,y]=fxy;
+                 //       Debug.Log(fxy);
+                    //    Debug.Log(x1);
+                      //  Debug.Log(x2);
+
+                }
+            }
+
+        return heightMapInterpolated;
+     }
        void  ClientInitMap(Vector2Int pos){
       //  Thread.Sleep(1000);
         frontChunk=GetChunk(new Vector2Int(chunkPos.x,chunkPos.y+chunkWidth));
@@ -261,7 +334,7 @@ public class Chunk : MonoBehaviour
      
        
        // await Task.Run(()=>{while(frontChunk==null||backChunk==null||leftChunk==null||rightChunk==null){}});
-    
+        chunkHeightMap=GenerateChunkHeightmap(chunkPos);
 
     
    //     FreshGenMap(pos);
@@ -482,9 +555,9 @@ public class Chunk : MonoBehaviour
                 return false;
         }
     }
-    public int GenerateBlockType(int x, int y, int z,Vector2Int pos){
+    public int PredictBlockType(float noiseValue,int y){
       
-        float noiseValue=chunkSeaLevel+noiseGenerator.GetSimplex(pos.x+x,pos.y+z)*20f;
+      //  float noiseValue=chunkSeaLevel+noiseGenerator.GetSimplex(pos.x+x,pos.y+z)*20f;
         if(noiseValue>y){
             return 1;
         }else{
@@ -506,20 +579,20 @@ public class Chunk : MonoBehaviour
             if(x>=chunkWidth){
                 if(rightChunk!=null&&rightChunk.isChunkDataDownloaded==true){
                 return rightChunk.map[0,y,z];    
-                }else return GenerateBlockType(x,y,z,chunkPos);
+                }else return PredictBlockType(chunkHeightMap[8+x,z+8],y);
                 
             }else if(z>=chunkWidth){
                 if(frontChunk!=null&&frontChunk.isChunkDataDownloaded==true){
                 return frontChunk.map[x,y,0];
-                 }else return GenerateBlockType(x,y,z,chunkPos);
+                 }else return PredictBlockType(chunkHeightMap[x+8,z+8],y);
             }else if(x<0){
                 if(leftChunk!=null&&leftChunk.isChunkDataDownloaded==true){
                 return leftChunk.map[chunkWidth-1,y,z];
-                 }else return GenerateBlockType(x,y,z,chunkPos);
+                 }else return PredictBlockType(chunkHeightMap[8+x,z+8],y);
             }else if(z<0){
                 if(backChunk!=null&&backChunk.isChunkDataDownloaded==true){
                 return backChunk.map[x,y,chunkWidth-1];
-                 }else return GenerateBlockType(x,y,z,chunkPos);
+                 }else return PredictBlockType(chunkHeightMap[x+8,8+z],y);
             }
            
         }
@@ -629,9 +702,9 @@ public class Chunk : MonoBehaviour
     chunkNonSolidMesh.RecalculateNormals();
    
     
- BakeJob bj=new BakeJob{meshes=meshesIDNative};
+ /*BakeJob bj=new BakeJob{meshes=meshesIDNative};
     JobHandle bjHandle = bj.Schedule(meshesIDNative.Length, 1);
-   bjHandle.Complete();
+   bjHandle.Complete();*/
    Task.Run(()=>{
         opqVertsNative.Dispose();
         opqUVsNative.Dispose();

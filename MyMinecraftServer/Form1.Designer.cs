@@ -33,6 +33,7 @@
             button2 = new Button();
             button3 = new Button();
             label1 = new Label();
+            button4 = new Button();
             SuspendLayout();
             // 
             // textBox1
@@ -91,11 +92,22 @@
             label1.Text = "Server Console";
             label1.TextAlign = ContentAlignment.MiddleCenter;
             // 
+            // button4
+            // 
+            button4.Location = new Point(33, 269);
+            button4.Name = "button4";
+            button4.Size = new Size(218, 29);
+            button4.TabIndex = 5;
+            button4.Text = "spawnentity";
+            button4.UseVisualStyleBackColor = true;
+            button4.Click += button4_Click;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(9F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(857, 450);
+            Controls.Add(button4);
             Controls.Add(label1);
             Controls.Add(button3);
             Controls.Add(button2);
@@ -117,5 +129,6 @@
         private Button button2;
         private Button button3;
         private Label label1;
+        private Button button4;
     }
 }

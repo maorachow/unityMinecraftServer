@@ -182,6 +182,8 @@ namespace MyMinecraftServer
         [IgnoreMember]
         public static FastNoise noiseGenerator = new FastNoise();
         [IgnoreMember]
+        public static FastNoise biomeNoiseGenerator = new FastNoise();
+        [IgnoreMember]
         public static int worldGenType = 0;//1 superflat 0 inf
         [IgnoreMember]
         public static int chunkWidth=16;
@@ -400,10 +402,10 @@ namespace MyMinecraftServer
         {
             Vector3Int intPos = Vector3Int.FloorToIntVec3(pos);
             Chunk chunkNeededUpdate = Program.GetChunk(Program.Vec3ToChunkPos(pos));
-       //     if (chunkNeededUpdate == null)
-      //      {
-       //         return -1;
-       //     }
+            if (chunkNeededUpdate == null)
+            {
+                return -1;
+            }
             Vector3Int chunkSpacePos = intPos - new Vector3Int(chunkNeededUpdate.chunkPos.x,0,chunkNeededUpdate.chunkPos.y);
             if(chunkSpacePos.x >= 0 && chunkSpacePos.x<chunkWidth&&chunkSpacePos.y<chunkHeight && chunkSpacePos.y >=0 && chunkSpacePos.z >= 0 && chunkSpacePos.z < chunkWidth)
             {
@@ -453,6 +455,82 @@ namespace MyMinecraftServer
             BlockModifyData b = new BlockModifyData(pos.X, pos.Y, pos.Z , blockID);
             Program.AppendMessage(null, new MessageProtocol(133, MessagePackSerializer.Serialize(b)));
         }
+        public static int[,] GenerateChunkBiomeMap(Vector2Int pos)
+        {
+            //   float[,] biomeMap=new float[chunkWidth/8+2,chunkWidth/8+2];//插值算法
+            //      int[,] chunkBiomeMap=GenerateChunkBiomeMap(pos);
+            int[,] biomeMapInter = new int[chunkWidth / 8 + 2, chunkWidth / 8 + 2];
+            for (int i = 0; i < chunkWidth / 8 + 2; i++)
+            {
+                for (int j = 0; j < chunkWidth / 8 + 2; j++)
+                {
+                    //           Debug.DrawLine(new Vector3(pos.x+(i-1)*8,60f,pos.y+(j-1)*8),new Vector3(pos.x+(i-1)*8,150f,pos.y+(j-1)*8),Color.green,1f);
+                    //    if(RandomGenerator3D.GenerateIntFromVec3(new Vector3Int()))
+
+                    biomeMapInter[i, j] = (int)(1f + biomeNoiseGenerator.GetSimplex(pos.x + (i - 1) * 8, pos.y + (j - 1) * 8) * 3f);
+                }
+            }//32,32
+
+
+
+            return biomeMapInter;
+        }
+        public static float[,] GenerateChunkHeightmap(Vector2Int pos)
+        {
+            float[,] heightMap = new float[chunkWidth / 8 + 2, chunkWidth / 8 + 2];//插值算法
+            int[,] chunkBiomeMap = GenerateChunkBiomeMap(pos);
+
+            for (int i = 0; i < chunkWidth / 8 + 2; i++)
+            {
+                for (int j = 0; j < chunkWidth / 8 + 2; j++)
+                {
+                    //           Debug.DrawLine(new Vector3(pos.x+(i-1)*8,60f,pos.y+(j-1)*8),new Vector3(pos.x+(i-1)*8,150f,pos.y+(j-1)*8),Color.green,1f);
+                    //    if(RandomGenerator3D.GenerateIntFromVec3(new Vector3Int()))
+
+                    heightMap[i, j] = chunkSeaLevel + noiseGenerator.GetSimplex(pos.x + (i - 1) * 8, pos.y + (j - 1) * 8) * 20f + chunkBiomeMap[i, j] * 25f;
+                }
+
+            }//32,32
+            int interMultiplier = 8;
+            float[,] heightMapInterpolated = new float[(chunkWidth / 8 + 2) * interMultiplier, (chunkWidth / 8 + 2) * interMultiplier];
+            for (int i = 0; i < (chunkWidth / 8 + 2) * interMultiplier; ++i)
+            {
+                for (int j = 0; j < (chunkWidth / 8 + 2) * interMultiplier; ++j)
+                {
+                    int x = i;
+                    int y = j;
+                    float x1 = (i / interMultiplier) * interMultiplier;
+                    float x2 = (i / interMultiplier) * interMultiplier + interMultiplier;
+                    float y1 = (j / interMultiplier) * interMultiplier;
+                    float y2 = (j / interMultiplier) * interMultiplier + interMultiplier;
+                    int x1Ori = (i / interMultiplier);
+                    // Debug.Log(x1Ori);
+                    int x2Ori = (i / interMultiplier) + 1;
+                    x2Ori = Math.Clamp(x2Ori, 0, (chunkWidth / 8 + 2) - 1);
+                    //   Debug.Log(x2Ori);
+                    int y1Ori = (j / interMultiplier);
+                    //   Debug.Log(y1Ori);
+                    int y2Ori = (j / interMultiplier) + 1;
+                    y2Ori = Math.Clamp(y2Ori, 0, (chunkWidth / 8 + 2) - 1);
+                    //     Debug.Log(y2Ori);
+
+                    float q11 = heightMap[x1Ori, y1Ori];
+                    float q12 = heightMap[x1Ori, y2Ori];
+                    float q21 = heightMap[x2Ori, y1Ori];
+                    float q22 = heightMap[x2Ori, y2Ori];
+                    float fxy1 = (float)(x2 - x) / (x2 - x1) * q11 + (float)(x - x1) / (x2 - x1) * q21;
+                    float fxy2 = (float)(x2 - x) / (x2 - x1) * q12 + (float)(x - x1) / (x2 - x1) * q22;
+                    float fxy = (float)(y2 - y) / (y2 - y1) * fxy1 + (float)(y - y1) / (y2 - y1) * fxy2;
+                    heightMapInterpolated[x, y] = fxy;
+                    //       Debug.Log(fxy);
+                    //    Debug.Log(x1);
+                    //  Debug.Log(x2);
+
+                }
+            }
+
+            return heightMapInterpolated;
+        }
         public async Task InitMap(Vector2Int chunkPos)
         {
 
@@ -474,6 +552,7 @@ namespace MyMinecraftServer
             leftChunk = Program.GetChunk(new Vector2Int(chunkPos.x - chunkWidth, chunkPos.y));
 
             rightChunk = Program.GetChunk(new Vector2Int(chunkPos.x + chunkWidth, chunkPos.y));
+            float[,] chunkHeightMap = GenerateChunkHeightmap(chunkPos);
             if (worldGenType == 1)
             {
             for(int i = 0; i < chunkWidth; i++)
@@ -507,12 +586,51 @@ namespace MyMinecraftServer
                        //    System.Random random=new System.Random(pos.x+pos.y);
                        int treeCount = 10;
 
-                       for (int i = 0; i < chunkWidth; i++)
+                    int[,] chunkBiomeMap = GenerateChunkBiomeMap(pos);
+
+                    int interMultiplier = 8;
+                    int[,] chunkBiomeMapInterpolated = new int[(chunkWidth / 8 + 2) * interMultiplier, (chunkWidth / 8 + 2) * interMultiplier];
+                    for (int i = 0; i < (chunkWidth / 8 + 2) * interMultiplier; ++i)
+                    {
+                        for (int j = 0; j < (chunkWidth / 8 + 2) * interMultiplier; ++j)
+                        {
+                            int x = i;
+                            int y = j;
+                            float x1 = (i / interMultiplier) * interMultiplier;
+                            float x2 = (i / interMultiplier) * interMultiplier + interMultiplier;
+                            float y1 = (j / interMultiplier) * interMultiplier;
+                            float y2 = (j / interMultiplier) * interMultiplier + interMultiplier;
+                            int x1Ori = (i / interMultiplier);
+                            // Debug.Log(x1Ori);
+                            int x2Ori = (i / interMultiplier) + 1;
+                            x2Ori = Math.Clamp(x2Ori, 0, (chunkWidth / 8 + 2) - 1);
+                            //   Debug.Log(x2Ori);
+                            int y1Ori = (j / interMultiplier);
+                            //   Debug.Log(y1Ori);
+                            int y2Ori = (j / interMultiplier) + 1;
+                            y2Ori = Math.Clamp(y2Ori, 0, (chunkWidth / 8 + 2) - 1);
+                            //     Debug.Log(y2Ori);
+
+                            float q11 = chunkBiomeMap[x1Ori, y1Ori];
+                            float q12 = chunkBiomeMap[x1Ori, y2Ori];
+                            float q21 = chunkBiomeMap[x2Ori, y1Ori];
+                            float q22 = chunkBiomeMap[x2Ori, y2Ori];
+                            float fxy1 = (float)(x2 - x) / (x2 - x1) * q11 + (float)(x - x1) / (x2 - x1) * q21;
+                            float fxy2 = (float)(x2 - x) / (x2 - x1) * q12 + (float)(x - x1) / (x2 - x1) * q22;
+                            int fxy = (int)((int)(y2 - y) / (y2 - y1) * fxy1 + (int)(y - y1) / (y2 - y1) * fxy2);
+                            chunkBiomeMapInterpolated[x, y] = fxy;
+                            //       Debug.Log(fxy);
+                            //    Debug.Log(x1);
+                            //  Debug.Log(x2);
+
+                        }
+                    }
+                    for (int i = 0; i < chunkWidth; i++)
                        {
                            for (int j = 0; j < chunkWidth; j++)
                            {
                                //  float noiseValue=200f*Mathf.PerlinNoise(pos.x*0.01f+i*0.01f,pos.y*0.01f+j*0.01f);
-                               float noiseValue = chunkSeaLevel + noiseGenerator.GetSimplex(pos.x + i, pos.y + j) * 20f;
+                               float noiseValue = chunkHeightMap[i+8,j+8];
                                for (int k = 0; k < chunkHeight; k++)
                                {
                                    if (noiseValue > k + 3)
@@ -521,17 +639,17 @@ namespace MyMinecraftServer
                                    }
                                    else if (noiseValue > k)
                                    {
-
-                                       map[i, k, j] = 3;
+                                    if (chunkBiomeMapInterpolated[i + 8, j + 8] == 3)
+                                    {
+                                        map[i, k, j] = 1;
+                                    }
+                                    else
+                                    {
+                                        map[i, k, j] = 3;
+                                    }
+                                       
                                    }
-                                   else
-                                   {
-                                       if (map[i, k, j] == 0)
-                                       {
-                                           map[i, k, j] = 0;
-                                       }
-
-                                   }
+                                  
 
                                }
                            }

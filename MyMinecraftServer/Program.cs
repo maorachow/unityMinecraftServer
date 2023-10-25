@@ -131,7 +131,8 @@ public sealed class Program
     public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>,int> toDoList=new PriorityQueue<KeyValuePair<Socket, MessageProtocol>,int>();
     public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int> toDoList3 = new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>();
     public static PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int> toDoList4 = new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>();*/
-    public static List<object> listLocks = new List<object> { new object(), new object(),new object(), new object(), new object(), new object(), new object(), new object() };
+    public static List<object> listLocks = new List<object> { new object(), new object(),new object(), new object(), new object(), new object(), new object(), new object(),
+     new object(), new object(),new object(), new object(), new object(), new object(), new object(), new object()};
     public static List<PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>> toDoLists=new List<PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>> { 
         new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() , 
         new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() , 
@@ -140,7 +141,15 @@ public sealed class Program
         new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
         new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
         new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
-        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() };//8线程
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>(),
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>(),
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>() ,
+        new PriorityQueue<KeyValuePair<Socket, MessageProtocol>, int>()};//8线程
     public static IPAddress ip = IPAddress.Parse("0.0.0.0");
     public static int port = 11111;
     public static Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -270,6 +279,17 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
         {
             return (int)f - 1;
         }
+    }
+    public static int FloorFloat(float n)
+    {
+        int i = (int)n;
+        return n >= i ? i : i - 1;
+    }
+
+    public static int CeilFloat(float n)
+    {
+        int i = (int)(n + 1);
+        return n >= i ? i : i - 1;
     }
     public static Vector2Int Vec3ToChunkPos(Vector3 pos)
     {
@@ -491,34 +511,27 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
         }
         
     }
+
+
     public static void UpdateData()
     {
        
         while (true)
         {
-            Thread.Sleep(100);
-            //  mainForm.LogOnTextbox("Update");
-            /*     if (toDoList.Count < toDoList2.Count)
-                 {
-                 lock(listLock)
-                 {
-
-                 toDoList.Enqueue(new KeyValuePair<Socket,MessageProtocol>(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update"))),10);
-
-
-                 }
-                 }
-                 else
-                 {
-                     lock (listLock2)
-                     {
-
-                         toDoList2.Enqueue(new KeyValuePair<Socket, MessageProtocol>(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update"))), 10);
-
-
-                     }
-                 }*/
+            Thread.Sleep(50);
+         
+            List<EntityData> entityList = new List<EntityData>();
+            lock (EntityBeh.worldEntities)
+            {
+            foreach(EntityBeh e in EntityBeh.worldEntities)
+            {
+                e.OnUpdate();
+                entityList.Add(e.ToEntityData());
+            }
+            }
+           
             AppendMessage(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update")));
+            AppendMessage(null, new MessageProtocol(142, MessagePackSerializer.Serialize(entityList, lz4Options)));
 
 
 
@@ -766,6 +779,9 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
                         CastToAllClients(new MessageProtocol(141, MessagePackSerializer.Serialize("update", lz4Options)));
 
                         break;
+                     case 142:
+                            CastToAllClients(new MessageProtocol(142, message.MessageData));
+                            break;
                     case 129:
                         UserLogin(s, message.MessageData);
                         //  s.Send(System.Text.Encoding.Default.GetBytes(JsonConvert.SerializeObject(new Message("LoginReturn", "Hello"))));
@@ -911,6 +927,7 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
     }
     public static void LoadApp()
     {
+        Chunk.biomeNoiseGenerator.SetFrequency(0.002f);
         mainForm.LogOnTextbox("Reading World Data...");
         Task t = new Task(() => ReadJson());
         t.RunSynchronously();
@@ -920,14 +937,14 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
         Thread updateThread = new Thread(() => UpdateData());
         updateThread.Start();
 
-      /*  Thread executeThread = new Thread(() => ExecuteToDoList(toDoList, listLock));
+      /*  Thread executeThread = new Thread(() => ExecuteToDoList(toDoList, listLock));    
         executeThread.Start();
         Thread executeThread2 = new Thread(() => ExecuteToDoList(toDoList2, listLock2));
         executeThread2.Start();*/
       foreach(var tdl in toDoLists)
         {
           //  Debug.WriteLine(toDoLists.Count);
-            Debug.WriteLine(listLocks.Count);
+         
             Thread executeThread = new Thread(() => ExecuteToDoList(tdl, listLocks[toDoLists.IndexOf(tdl)]));
             executeThread.Start();
         }

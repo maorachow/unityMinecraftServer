@@ -8,7 +8,7 @@ public sealed class MessageProtocol
 {
     public const int HEADLENGTH = 5;  // 协议首部长度(命令1字节+参数1字节+数据长度4字节=6字节)
     private byte _Command = 0;//128 worlddata 129login 130logout 131updateuser 132updatechunk 133updatechunkinternal 134chunkgen 135returnalluserdata 136loginreturn
-    //138emitparticle 139clientmodifychunk 140updatealluser 141clientupdateuser
+    //138emitparticle 139clientmodifychunk 140updatealluser 141clientupdateuser 142entitydata
     public byte Command { get => this._Command; }  // 协议信令标志 (值范围0~255)
                                                    // private byte _Param = 0;
                                                    // public byte Param { get => this._Param; }  // 信令参数标志(范围0~255)
