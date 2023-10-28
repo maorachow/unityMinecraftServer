@@ -35,7 +35,7 @@ public class AllPlayersManager : MonoBehaviour
 
             PlayerMove pm=null;
             if(!playerPrefabsInClient.ContainsKey(u.userName)){
-                GameObject a=Instantiate(playerPrefab,new Vector3(u.posX,u.posY,u.posZ),Quaternion.Euler(0f,u.rotY,0f));
+                GameObject a=Instantiate(playerPrefab,new Vector3(u.posX,u.posY,u.posZ),Quaternion.identity);
                 playerPrefabsInClient.Add(u.userName,a);
                 pm=playerPrefabsInClient[u.userName].GetComponent<PlayerMove>();
             }else{

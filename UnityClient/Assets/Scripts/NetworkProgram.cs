@@ -34,8 +34,12 @@ using MessagePack;
      public float rotZ;
      [Key(7)]
      public string entityID;
+     [Key(8)]
+     public float entityHealth;
+     [Key(9)]
+     public bool isEntityHurt;
 
-     public EntityData(int typeid, float posX, float posY, float posZ, float rotX, float rotY, float rotZ, string entityID)
+     public EntityData(int typeid, float posX, float posY, float posZ, float rotX, float rotY, float rotZ, string entityID, float entityHealth, bool isEntityHurt)
      {
          this.typeid = typeid;
          this.posX = posX;
@@ -45,6 +49,8 @@ using MessagePack;
          this.rotY = rotY;
          this.rotZ = rotZ;
          this.entityID = entityID;
+         this.entityHealth = entityHealth;
+         this.isEntityHurt = isEntityHurt;
      }
  }
 
@@ -58,6 +64,22 @@ public class ChunkData{
     public ChunkData(int[,,] map,Vector2Int chunkPos){
         this.map=map;
         this.chunkPos=chunkPos;
+    }
+}
+
+
+[MessagePackObject]
+public class HurtEntityData
+{
+    [Key(0)]
+    public string entityID;
+    [Key(1)]
+    public float hurtValue;
+
+    public HurtEntityData(string entityID, float hurtValue)
+    {
+        this.entityID = entityID;
+        this.hurtValue = hurtValue;
     }
 }
 [MessagePackObject]

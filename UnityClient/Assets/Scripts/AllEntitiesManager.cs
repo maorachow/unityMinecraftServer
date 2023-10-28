@@ -7,12 +7,15 @@ public class AllEntitiesManager : MonoBehaviour
     public static GameObject zombiePrefab;
    public static Dictionary<string,GameObject> entityPrefabsInClient=new Dictionary<string,GameObject>();
    public static List<EntityData> allEntityData=new List<EntityData>();
-
+void Start(){
+    entityPrefabsInClient=new Dictionary<string,GameObject>();
+    allEntityData=new List<EntityData>();
+}
     void UpdateAllEntities(){
         foreach(EntityData e in allEntityData){
             if(!entityPrefabsInClient.ContainsKey(e.entityID)){
                 if(e.typeid==0){
-                  GameObject a=Instantiate(zombiePrefab,new Vector3(e.posX,e.posY,e.posZ),Quaternion.Euler(new Vector3(e.rotX,e.rotY,e.rotZ)));
+                  GameObject a=Instantiate(zombiePrefab,new Vector3(e.posX,e.posY,e.posZ),Quaternion.identity);
                   entityPrefabsInClient.Add(e.entityID,a);
 
                 }
@@ -21,13 +24,20 @@ public class AllEntitiesManager : MonoBehaviour
         }
         foreach(EntityData et in allEntityData){
             if(entityPrefabsInClient.ContainsKey(et.entityID)){
-                entityPrefabsInClient[et.entityID].transform.position=Vector3.Lerp(entityPrefabsInClient[et.entityID].transform.position,new Vector3(et.posX,et.posY,et.posZ),10f*Time.deltaTime);
-                 entityPrefabsInClient[et.entityID].transform.rotation=Quaternion.Euler(new Vector3(et.rotX,et.rotY,et.rotZ));
+                ZombieEntityBeh zombie= entityPrefabsInClient[et.entityID].GetComponent<ZombieEntityBeh>();
+           //     entityPrefabsInClient[et.entityID].transform.position=Vector3.Lerp(entityPrefabsInClient[et.entityID].transform.position,new Vector3(et.posX,et.posY,et.posZ),10f*Time.deltaTime);
+             //    entityPrefabsInClient[et.entityID].transform.rotation=Quaternion.Euler(new Vector3(et.rotX,et.rotY,et.rotZ));
+             zombie.transform.position=Vector3.Lerp(zombie.transform.position,new Vector3(et.posX,et.posY,et.posZ),10f*Time.deltaTime);
+             if(zombie.headTrans!=null){
+             zombie.headTrans.rotation=Quaternion.Euler(new Vector3(et.rotX,et.rotY,et.rotZ));   
+             }
+             
+             zombie.isEntityHurt=et.isEntityHurt;
             }
         }
     }
     void Awake(){
-        zombiePrefab=Resources.Load<GameObject>("Prefabs/testentity");
+        zombiePrefab=Resources.Load<GameObject>("Prefabs/zombie");
     }
     void ClearEntities(){
               List<KeyValuePair<string,GameObject>> toDestroy=new List<KeyValuePair<string,GameObject>>();
@@ -43,7 +53,7 @@ public class AllEntitiesManager : MonoBehaviour
         }
     }
     // Update is called once per frame
-    void FixedUpdate()
+    void Update()
     {
         UpdateAllEntities();
         ClearEntities();

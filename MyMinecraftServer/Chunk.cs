@@ -10,6 +10,7 @@ using System.Runtime.Serialization;
 using System.Runtime.CompilerServices;
 using System.Collections;
 using System.Net.Sockets;
+using System.Diagnostics;
 namespace MyMinecraftServer
 {
     [MessagePackObject]
@@ -404,7 +405,7 @@ namespace MyMinecraftServer
             Chunk chunkNeededUpdate = Program.GetChunk(Program.Vec3ToChunkPos(pos));
             if (chunkNeededUpdate == null)
             {
-                return -1;
+                return 1;
             }
             Vector3Int chunkSpacePos = intPos - new Vector3Int(chunkNeededUpdate.chunkPos.x,0,chunkNeededUpdate.chunkPos.y);
             if(chunkSpacePos.x >= 0 && chunkSpacePos.x<chunkWidth&&chunkSpacePos.y<chunkHeight && chunkSpacePos.y >=0 && chunkSpacePos.z >= 0 && chunkSpacePos.z < chunkWidth)
@@ -417,7 +418,37 @@ namespace MyMinecraftServer
             }
            
         }
+        public static int GetBlockLandingPoint(Vector2 pos)
+        {
+            Vector3Int intPos = Vector3Int.FloorToIntVec3(new Vector3(pos.X,0f,pos.Y));
+            Chunk chunkNeededUpdate = Program.GetChunk(Program.Vec3ToChunkPos(new Vector3(pos.X,0,pos.Y)));
+            if (chunkNeededUpdate == null)
+            {
+                return 100;
+            }
+            Vector3Int chunkSpacePos = intPos - new Vector3Int(chunkNeededUpdate.chunkPos.x, 0, chunkNeededUpdate.chunkPos.y);
+           
+                for(int i = 250; i > 40; i--)
+                {
+                if(chunkNeededUpdate.map[chunkSpacePos.x, i, chunkSpacePos.z]>0&& chunkNeededUpdate.map[chunkSpacePos.x, i, chunkSpacePos.z] < 100)
+                {
+                        Debug.WriteLine("get");
+                        return i;
+                }
+                else
+                {
+                    continue;
+                }
+                   
+                } 
+            Debug.WriteLine("noneget2");
+                Debug.WriteLine("noneget");
+            Debug.WriteLine(chunkSpacePos.x+" "+chunkSpacePos.y+ " " + chunkSpacePos.z);
+                return 100;
+            
+         
 
+        }
         public void SaveSingleChunk()
         {
 

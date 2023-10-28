@@ -165,7 +165,7 @@ public class PlayerMove : MonoBehaviour
         
         
         NetworkProgram.currentPlayer.posX=transform.position.x;
-        NetworkProgram.currentPlayer.posY=transform.position.y;
+        NetworkProgram.currentPlayer.posY=transform.position.y-0.5f;
         NetworkProgram.currentPlayer.posZ=transform.position.z;
         NetworkProgram.currentPlayer.rotX=headTrans.eulerAngles.x;     
         NetworkProgram.currentPlayer.rotY=headTrans.eulerAngles.y;    
@@ -222,6 +222,18 @@ public class PlayerMove : MonoBehaviour
     }
      void BreakBlock(){
         Ray ray=mainCam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        foreach(var entity in AllEntitiesManager.entityPrefabsInClient){
+
+            if(entity.Value.GetComponent<ZombieEntityBeh>()!=null){
+                if(entity.Value.GetComponent<ZombieEntityBeh>().entityBounds.IntersectRay(ray)){
+                    HurtEntityData hed=new HurtEntityData(entity.Key,4f);
+                    NetworkProgram.SendMessageToServer(new MessageProtocol(143,MessagePackSerializer.Serialize(hed)));
+                    isPlayerAttacking=true;
+                    Invoke("InvokeStopAttack",0.3f);
+                    return;
+                }
+            }
+        }
         RaycastHit info;
         if(Physics.Raycast(ray,out info,10f)){
             Vector3 hitBlockPoint=info.point+cameraTrans.forward*0.01f;

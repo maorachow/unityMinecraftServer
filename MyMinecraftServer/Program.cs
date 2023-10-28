@@ -101,7 +101,20 @@ public class UserData {
         this.isAttacking = isAttacking;
     }
 }
+[MessagePackObject]
+public class HurtEntityData
+{
+    [Key(0)]
+    public string entityID;
+    [Key(1)]
+    public float hurtValue;
 
+    public HurtEntityData(string entityID, float hurtValue)
+    {
+        this.entityID = entityID;
+        this.hurtValue = hurtValue;
+    }
+}
 
 /*public class Message
 {
@@ -523,13 +536,25 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
             List<EntityData> entityList = new List<EntityData>();
             lock (EntityBeh.worldEntities)
             {
-            foreach(EntityBeh e in EntityBeh.worldEntities)
+            for(int i=0;i<EntityBeh.worldEntities.Count;i++)
             {
+                    EntityBeh e = EntityBeh.worldEntities[i];
                 e.OnUpdate();
                 entityList.Add(e.ToEntityData());
             }
             }
-           
+            for(int i=0;i<allUserData.Count;i++)
+            {
+               
+                Random rand = new Random();
+                if (rand.Next(100) > 98)
+                {
+                    Vector2 monsterSpawnPos=new Vector2(allUserData[i].posX+ rand.Next(-40,40), allUserData[i].posZ + rand.Next(-40, 40));
+                    EntityBeh.SpawnNewEntity(new Vector3(monsterSpawnPos.X, Chunk.GetBlockLandingPoint(monsterSpawnPos), monsterSpawnPos.Y), 0, 0, 0, 0);
+                }
+                
+
+            }
             AppendMessage(null, new MessageProtocol(140, MessagePackSerializer.Serialize("update")));
             AppendMessage(null, new MessageProtocol(142, MessagePackSerializer.Serialize(entityList, lz4Options)));
 
@@ -781,6 +806,10 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
                         break;
                      case 142:
                             CastToAllClients(new MessageProtocol(142, message.MessageData));
+                            break;
+                     case 143:
+                            HurtEntityData hed = MessagePackSerializer.Deserialize<HurtEntityData>(message.MessageData);
+                            EntityBeh.HurtEntity(hed.entityID, hed.hurtValue);
                             break;
                     case 129:
                         UserLogin(s, message.MessageData);
