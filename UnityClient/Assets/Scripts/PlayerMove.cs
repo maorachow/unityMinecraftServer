@@ -165,7 +165,7 @@ public class PlayerMove : MonoBehaviour
         
         
         NetworkProgram.currentPlayer.posX=transform.position.x;
-        NetworkProgram.currentPlayer.posY=transform.position.y-0.5f;
+        NetworkProgram.currentPlayer.posY=transform.position.y-1f;
         NetworkProgram.currentPlayer.posZ=transform.position.z;
         NetworkProgram.currentPlayer.rotX=headTrans.eulerAngles.x;     
         NetworkProgram.currentPlayer.rotY=headTrans.eulerAngles.y;    

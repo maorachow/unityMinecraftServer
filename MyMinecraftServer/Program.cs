@@ -547,7 +547,7 @@ chunkDataReadFromDisk=MessagePackSerializer.Deserialize<Dictionary<Vector2Int,Ch
             {
                
                 Random rand = new Random();
-                if (rand.Next(100) > 98)
+                if (rand.Next(100) > 98&&EntityBeh.worldEntities.Count<70)
                 {
                     Vector2 monsterSpawnPos=new Vector2(allUserData[i].posX+ rand.Next(-40,40), allUserData[i].posZ + rand.Next(-40, 40));
                     EntityBeh.SpawnNewEntity(new Vector3(monsterSpawnPos.X, Chunk.GetBlockLandingPoint(monsterSpawnPos), monsterSpawnPos.Y), 0, 0, 0, 0);

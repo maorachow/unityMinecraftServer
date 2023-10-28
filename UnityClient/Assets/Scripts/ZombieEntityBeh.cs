@@ -31,15 +31,17 @@ public class ZombieEntityBeh : MonoBehaviour
 		lastpos = curpos;//把当前点保存下一次用
 		return _speed;
 	}
-    
+    float entitySpeed;
     void Update()
     {
         if(NetworkProgram.isGamePaused==true){
             am.Play("zombiewalk",0,0f);
+         //   am.SetFloat("speed",1f);
             return;
         }
+        entitySpeed=Speed();
         entityBounds.center=transform.position+new Vector3(0f,0.9f,0f);
-        am.SetFloat("speed",Speed()/3f);
+        am.SetFloat("speed",entitySpeed/3f);
         entityMoveRef.rotation=Quaternion.Euler(0f,headTrans.eulerAngles.y,0f);
         bodyTrans.rotation=Quaternion.Lerp(bodyTrans.rotation,entityMoveRef.rotation,Time.deltaTime*10f);
         if(prevIsEntityHurt!=isEntityHurt){
