@@ -165,7 +165,7 @@ public class PlayerMove : MonoBehaviour
         
         
         NetworkProgram.currentPlayer.posX=transform.position.x;
-        NetworkProgram.currentPlayer.posY=transform.position.y-1f;
+        NetworkProgram.currentPlayer.posY=transform.position.y;
         NetworkProgram.currentPlayer.posZ=transform.position.z;
         NetworkProgram.currentPlayer.rotX=headTrans.eulerAngles.x;     
         NetworkProgram.currentPlayer.rotY=headTrans.eulerAngles.y;    
@@ -226,7 +226,7 @@ public class PlayerMove : MonoBehaviour
 
             if(entity.Value.GetComponent<ZombieEntityBeh>()!=null){
                 if(entity.Value.GetComponent<ZombieEntityBeh>().entityBounds.IntersectRay(ray)){
-                    HurtEntityData hed=new HurtEntityData(entity.Key,4f);
+                    HurtEntityData hed=new HurtEntityData(entity.Key,3f,transform.position.x,transform.position.y,transform.position.z);
                     NetworkProgram.SendMessageToServer(new MessageProtocol(143,MessagePackSerializer.Serialize(hed)));
                     isPlayerAttacking=true;
                     Invoke("InvokeStopAttack",0.3f);

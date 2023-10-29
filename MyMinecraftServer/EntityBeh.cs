@@ -73,6 +73,7 @@ namespace MyMinecraftServer
         public float entityHealth;
         public bool isEntityHurt;
         public float entityHurtCD;
+        public Vector3 entityMotionVec;
         public EntityBeh(Vector3 position, float rotationX, float rotationY, float rotationZ, int typeID, string entityID,float entityHealth,bool isEntityHurt)
         {
             this.position = position;
@@ -125,6 +126,7 @@ namespace MyMinecraftServer
         {
 
 
+            entityMotionVec = Vector3.Lerp(entityMotionVec, Vector3.Zero, 5f / 20f);
 
             float curSpeed = Vec3Magnitude((position - lastPos)/(1f/20f));
             lastPos = position;
@@ -140,7 +142,7 @@ namespace MyMinecraftServer
           if(Program.allUserData.Count > 0)
             {
                 Vector3 movePos = new Vector3(Program.allUserData[0].posX - position.X, 0, Program.allUserData[0].posZ - position.Z);
-                Vector3 lookPos = new Vector3(Program.allUserData[0].posX - position.X, Program.allUserData[0].posY - position.Y, Program.allUserData[0].posZ - position.Z);
+                Vector3 lookPos = new Vector3(Program.allUserData[0].posX - position.X, Program.allUserData[0].posY - position.Y-1f, Program.allUserData[0].posZ - position.Z);
                 Vector3 movePosN=Vector3.Normalize(movePos)*0.3f;
                 entityVec = movePosN;
                 Vector3 entityRot = LookRotation(lookPos);
@@ -195,18 +197,32 @@ namespace MyMinecraftServer
                     }
                     
                     
-                    if (isGround&&curSpeed<=0.1f)
+               
+                    if (Program.allUserData.Count > 0) {
+                    Vector3 movePos = new Vector3(Program.allUserData[0].posX - position.X, 0, Program.allUserData[0].posZ - position.Z);
+                    if (isGround&&curSpeed<=0.1f&& Vec3Magnitude(movePos) > 2f)
                     {
                       //  Debug.WriteLine("jump");
                       //  entityBounds = entityBounds.offset(0f, 0.1f, 0f);
                         entityVec.Y = 2f;
                     }
-                EntityMove(entityVec.X, entityVec.Y, entityVec.Z);
+
+                        
+                        if (Vec3Magnitude(movePos) > 2f)
+                        {
+                        EntityMove(entityVec.X, entityVec.Y, entityVec.Z);
+                        }
+                       
+                        EntityMove(entityMotionVec.X, entityVec.Y+entityMotionVec.Y, entityMotionVec.Z);
+                        
+                    }
+                    
+               
                     break;
             }
             
         }
-        public static void HurtEntity(string entityID,float hurtValue)
+        public static void HurtEntity(string entityID,float hurtValue,Vector3 sourcePos)
         {
             EntityBeh entityBeh;
             int index = worldEntities.FindIndex((EntityBeh e) => { return entityID == e.entityID; });
@@ -224,6 +240,7 @@ namespace MyMinecraftServer
             }
             entityBeh.entityHealth -= hurtValue;
             entityBeh.entityHurtCD = 0.2f;
+            entityBeh.entityMotionVec =entityBeh.position-sourcePos;
         }
         public Vector3 LookRotation(Vector3 fromDir)
         {

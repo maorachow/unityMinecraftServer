@@ -75,11 +75,20 @@ public class HurtEntityData
     public string entityID;
     [Key(1)]
     public float hurtValue;
+    [Key(2)]
+    public float sourcePosX;
+    [Key(3)]
+    public float sourcePosY;
+    [Key(4)]
+    public float sourcePosZ;
 
-    public HurtEntityData(string entityID, float hurtValue)
+    public HurtEntityData(string entityID, float hurtValue, float sourcePosX, float sourcePosY, float sourcePosZ)
     {
         this.entityID = entityID;
         this.hurtValue = hurtValue;
+        this.sourcePosX = sourcePosX;
+        this.sourcePosY = sourcePosY;
+        this.sourcePosZ = sourcePosZ;
     }
 }
 [MessagePackObject]
